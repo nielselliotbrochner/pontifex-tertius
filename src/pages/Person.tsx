@@ -7,7 +7,8 @@ import { useLookups } from '../lib/lookups';
 import { CompanyPick, findCompany, useCompanyOpts } from '../lib/CompanyPick';
 
 type Contact = { id: string; first_name: string; middle_name: string | null; last_name: string | null; email: string | null; phone: string | null; linkedin_url: string | null };
-type Rel = { acquaintance_id: string | null; mobile: string | null; notes: string | null };
+type Rel = { acquaintance_id: string | null; mobile: string | null; notes: string | null; podcast_relevant: boolean };
+type Act = { id: string; occurred_on: string; title: string; type: { name: string } | null };
 type Aff = { id: string; company_id: string; title: string | null; is_primary: boolean; end_date: string | null; company: { name: string } | null; affiliation_type: { name: string } | null; contact_company_level: { level: { name: string; sort_order: number; is_ranked: boolean } | null }[] };
 
 const blank: Contact = { id: '', first_name: '', middle_name: '', last_name: '', email: '', phone: '', linkedin_url: '' };
@@ -16,23 +17,27 @@ const nz = (s: string | null | undefined) => (s && s.trim() ? s.trim() : null);
 export default function Person({ id }: { id: string | null }) {
   const lk = useLookups();
   const { data, error, loading, reload } = useAsync(async () => {
-    if (!id) return { c: blank, rel: { acquaintance_id: null, mobile: '', notes: '' } as Rel, affs: [] as Aff[] };
-    const [c, rel, affs] = await Promise.all([
+    if (!id) return { c: blank, rel: { acquaintance_id: null, mobile: '', notes: '', podcast_relevant: false } as Rel, affs: [] as Aff[], labels: [] as string[], activities: [] as Act[] };
+    const [c, rel, affs, labs, acts] = await Promise.all([
       supabase.from('contact').select('*').eq('id', id).single(),
-      supabase.from('contact_relation').select('acquaintance_id,mobile,notes').eq('contact_id', id).maybeSingle(),
+      supabase.from('contact_relation').select('acquaintance_id,mobile,notes,podcast_relevant').eq('contact_id', id).maybeSingle(),
       supabase.from('contact_company').select('id,company_id,title,is_primary,end_date,company(name),affiliation_type(name),contact_company_level(level(name,sort_order,is_ranked))').eq('contact_id', id).order('end_date', { nullsFirst: true }),
+      supabase.from('contact_label').select('label_id').eq('contact_id', id),
+      supabase.from('activity_participant').select('activity(id,occurred_on,title,type:activity_type(name))').eq('contact_id', id),
     ]);
     if (c.error) throw c.error;
-    return { c: c.data as Contact, rel: (rel.data ?? { acquaintance_id: null, mobile: '', notes: '' }) as Rel, affs: (affs.data ?? []) as unknown as Aff[] };
+    const activities = ((acts.data ?? []) as unknown as { activity: Act | null }[]).map((x) => x.activity).filter((a): a is Act => !!a).sort((a, b) => b.occurred_on.localeCompare(a.occurred_on));
+    return { c: c.data as Contact, rel: (rel.data ?? { acquaintance_id: null, mobile: '', notes: '', podcast_relevant: false }) as Rel, affs: (affs.data ?? []) as unknown as Aff[], labels: (labs.data ?? []).map((x: { label_id: string }) => x.label_id), activities };
   }, [id]);
   const [edit, setEdit] = useState(!id);
   const [f, setF] = useState<Contact | null>(null);
   const [r, setR] = useState<Rel | null>(null);
+  const [lb, setLb] = useState<string[] | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   if (error) return <Err msg={error} />;
   if (loading || !data) return <p className="mute">Henter</p>;
-  const c = f ?? data.c; const rel = r ?? data.rel;
+  const c = f ?? data.c; const rel = r ?? data.rel; const labels = lb ?? data.labels;
   const set = (k: keyof Contact, v: string) => setF({ ...c, [k]: v });
 
   async function save() {
@@ -41,11 +46,13 @@ export default function Person({ id }: { id: string | null }) {
     const res = id ? await supabase.from('contact').update(payload).eq('id', id).select('id').single() : await supabase.from('contact').insert(payload).select('id').single();
     if (res.error) { setMsg(res.error.message.includes('contact_linkedin_uq') ? 'LinkedIn-profilen findes allerede hos en anden person.' : res.error.message); setBusy(false); return; }
     const cid = res.data.id as string;
-    const rr = await supabase.from('contact_relation').upsert({ contact_id: cid, acquaintance_id: rel.acquaintance_id || null, mobile: nz(rel.mobile), notes: nz(rel.notes) }, { onConflict: 'owner_id,contact_id' });
+    const rr = await supabase.from('contact_relation').upsert({ contact_id: cid, acquaintance_id: rel.acquaintance_id || null, mobile: nz(rel.mobile), notes: nz(rel.notes), podcast_relevant: !!rel.podcast_relevant }, { onConflict: 'owner_id,contact_id' });
+    await supabase.from('contact_label').delete().eq('contact_id', cid);
+    if (labels.length) await supabase.from('contact_label').insert(labels.map((label_id) => ({ contact_id: cid, label_id })));
     setBusy(false);
     if (rr.error) { setMsg(rr.error.message); return; }
     go('person', cid);
-    setEdit(false); setF(null); setR(null); reload();
+    setEdit(false); setF(null); setR(null); setLb(null); reload();
   }
   async function del() {
     if (!id || !confirm('Slet personen og alle tilknytninger?')) return;
@@ -78,22 +85,28 @@ export default function Person({ id }: { id: string | null }) {
             <Field label="Telefon arbejde (delt)"><input value={c.phone ?? ''} onChange={(e) => set('phone', e.target.value)} /></Field>
             <Field label="LinkedIn"><input value={c.linkedin_url ?? ''} onChange={(e) => set('linkedin_url', e.target.value)} placeholder="https://www.linkedin.com/in/..." /></Field>
           </div>
+          <h2>Labels</h2>
+          <div>{lk.data?.label.map((o) => <label className="check" key={o.id} style={{ display: 'inline-flex', marginRight: 16 }}>
+            <input type="checkbox" checked={labels.includes(o.id)} onChange={(e) => setLb(e.target.checked ? [...labels, o.id] : labels.filter((x) => x !== o.id))} />{o.name}</label>)}</div>
           <h2>Kun synligt for dig</h2>
           <div className="grid">
             <Field label="Mobil (privat)"><input value={rel.mobile ?? ''} onChange={(e) => setR({ ...rel, mobile: e.target.value })} /></Field>
             <Field label="Kendskab"><select value={rel.acquaintance_id ?? ''} onChange={(e) => setR({ ...rel, acquaintance_id: e.target.value || null })}><option value="">Ikke angivet</option>{lk.data?.acquaintance.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select></Field>
+            <label className="check"><input type="checkbox" checked={!!rel.podcast_relevant} onChange={(e) => setR({ ...rel, podcast_relevant: e.target.checked })} /> Relevant for podcast</label>
             <Field label="Noter (private)" wide><textarea rows={5} value={rel.notes ?? ''} onChange={(e) => setR({ ...rel, notes: e.target.value })} /></Field>
           </div>
           <div className="bar">
             <button className="btn" disabled={busy || !c.first_name.trim()} onClick={save}>Gem</button>
-            <button className="btn ghost" onClick={() => (id ? (setEdit(false), setF(null), setR(null)) : go('personer'))}>Annuller</button>
+            <button className="btn ghost" onClick={() => (id ? (setEdit(false), setF(null), setR(null), setLb(null)) : go('personer'))}>Annuller</button>
             <span className="grow" />
             {id && <button className="btn ghost" onClick={del}>Slet</button>}
           </div>
         </>
       ) : (
         <>
-          <div className="bar"><button className="btn ghost sm" onClick={() => setEdit(true)}>Redigér</button></div>
+          <div className="bar"><button className="btn ghost sm" onClick={() => setEdit(true)}>Redigér</button>
+            {rel.podcast_relevant && <span className="dm">Relevant for podcast</span>}
+            {data.labels.map((l) => <span className="tag" key={l}>{lk.data?.label.find((o) => o.id === l)?.name}</span>)}</div>
           <div className="row2">
             <div className="panel"><h2>Privat</h2>
               <p>{rel.mobile ? <>Mobil {rel.mobile}</> : <span className="mute">Intet mobilnummer</span>}</p>
@@ -102,6 +115,8 @@ export default function Person({ id }: { id: string | null }) {
           </div>
         </>
       )}
+      {id && !edit && (<><h2>Aktiviteter</h2>{data.activities.length === 0 ? <p className="mute">Ingen aktiviteter.</p> :
+        <ul className="list">{data.activities.map((a) => <li key={a.id}><span className="mute" style={{ minWidth: 92 }}>{a.occurred_on}</span><span className="grow">{a.title}</span><span className="tag">{a.type?.name}</span></li>)}</ul>}</>)}
       {id && <Affiliations contactId={id} cur={cur} past={past} onChange={reload} />}
     </>
   );

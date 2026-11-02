@@ -2,23 +2,34 @@ import { useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAsync } from '../lib/useAsync';
 import { Link, Empty, Err, fullName } from '../lib/ui';
+import { useLookups } from '../lib/lookups';
 
-type Row = { contact_id: string; first_name: string; middle_name: string | null; last_name: string | null; email: string | null; company_name: string | null;
+type Row = { podcast?: boolean; label_ids?: string[]; contact_id: string; first_name: string; middle_name: string | null; last_name: string | null; email: string | null; company_name: string | null;
   title: string | null; labels: string | null; rank: number | null; is_decision_maker: boolean | null; city: string | null };
 
 export default function Persons() {
   const { data, error, loading } = useAsync(async () => {
     const r = await supabase.from('v_contact_overview').select('contact_id,first_name,middle_name,last_name,email,company_name,title,labels,rank,is_decision_maker,city').eq('active', true).order('last_name').limit(5000);
     if (r.error) throw r.error;
-    return r.data as Row[];
+    const [pod, lab] = await Promise.all([
+      supabase.from('contact_relation').select('contact_id').eq('podcast_relevant', true).limit(5000),
+      supabase.from('contact_label').select('contact_id,label_id').limit(20000),
+    ]);
+    const podSet = new Set((pod.data ?? []).map((x: { contact_id: string }) => x.contact_id));
+    const labs = new Map<string, string[]>();
+    (lab.data ?? []).forEach((x: { contact_id: string; label_id: string }) => labs.set(x.contact_id, [...(labs.get(x.contact_id) ?? []), x.label_id]));
+    return (r.data as Row[]).map((x) => ({ ...x, podcast: podSet.has(x.contact_id), label_ids: labs.get(x.contact_id) ?? [] }));
   }, [], 'persons');
+  const lk = useLookups();
+  const [pc, setPc] = useState(false);
+  const [lbl, setLbl] = useState('');
   const [q, setQ] = useState('');
   const [dm, setDm] = useState(false);
   const rows = useMemo(() => {
     const s = q.trim().toLowerCase();
-    return (data ?? []).filter((r) => (!dm || r.is_decision_maker) &&
+    return (data ?? []).filter((r) => (!dm || r.is_decision_maker) && (!pc || r.podcast) && (!lbl || r.label_ids?.includes(lbl)) &&
       (!s || [fullName(r), r.company_name, r.title, r.email, r.city].some((x) => x?.toLowerCase().includes(s))));
-  }, [data, q, dm]);
+  }, [data, q, dm, pc, lbl]);
   const total = data?.length ?? 0;
   const dms = (data ?? []).filter((r) => r.is_decision_maker).length;
   return (
@@ -27,10 +38,13 @@ export default function Persons() {
       <div className="kpis">
         <div><b>{total}</b><span>personer</span></div>
         <div><b>{dms}</b><span>beslutningstagere</span></div>
+        <div><b>{(data ?? []).filter((r) => r.podcast).length}</b><span>relevante for podcast</span></div>
       </div>
       <div className="bar">
         <input className="grow" type="search" placeholder="Søg navn, virksomhed, titel, by" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Søg" />
         <label className="check"><input type="checkbox" checked={dm} onChange={(e) => setDm(e.target.checked)} /> Kun beslutningstagere</label>
+        <label className="check"><input type="checkbox" checked={pc} onChange={(e) => setPc(e.target.checked)} /> Podcast</label>
+        <select value={lbl} onChange={(e) => setLbl(e.target.value)} aria-label="Label"><option value="">Alle labels</option>{lk.data?.label.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select>
         <Link view="person-ny" className="btn">Ny person</Link>
       </div>
       <Err msg={error} />
