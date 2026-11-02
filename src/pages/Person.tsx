@@ -5,6 +5,7 @@ import { go } from '../lib/nav';
 import { Link, Err, Field, fullName } from '../lib/ui';
 import { useLookups } from '../lib/lookups';
 import MergePerson from './MergePerson';
+import ContactFiles from './ContactFiles';
 import { CompanyPick, findCompany, useCompanyOpts } from '../lib/CompanyPick';
 
 type Contact = { id: string; first_name: string; middle_name: string | null; last_name: string | null; email: string | null; phone: string | null; linkedin_url: string | null };
@@ -58,8 +59,10 @@ export default function Person({ id }: { id: string | null }) {
     setEdit(false); setF(null); setR(null); setLb(null); reload();
   }
   async function del() {
-    if (!id || !confirm('Slet personen og alle tilknytninger?')) return;
+    if (!id || !confirm(`Slet ${fullName(c)} permanent? Tilknytninger, labels, private noter og filer på personen slettes, og personen fjernes fra aktiviteter. Det kan ikke fortrydes.`)) return;
+    const fl = await supabase.from('contact_file').select('path').eq('contact_id', id);
     const x = await supabase.from('contact').delete().eq('id', id);
+    if (!x.error && fl.data?.length) await supabase.storage.from('contact-files').remove(fl.data.map((f: { path: string }) => f.path));
     if (x.error) setMsg(x.error.message); else go('personer');
   }
 
@@ -122,7 +125,9 @@ export default function Person({ id }: { id: string | null }) {
         <ul className="list">{data.activities.map((a) => <li key={a.id}><span className="mute" style={{ minWidth: 92 }}>{a.occurred_on}</span><span className="grow"><Link view="aktivitet" id={a.id}>{a.title}</Link></span><span className="tag">{a.type?.name}</span></li>)}</ul>}
         {data.mentioned.length > 0 && (<><h2>Omtalt i</h2><ul className="list">{data.mentioned.map((a) => <li key={a.id}><span className="mute" style={{ minWidth: 92 }}>{a.occurred_on}</span><span className="grow"><Link view="aktivitet" id={a.id}>{a.title}</Link></span><span className="tag">{a.type?.name}</span></li>)}</ul></>)}</>)}
       {id && <Affiliations contactId={id} cur={cur} past={past} onChange={reload} />}
+      {id && !edit && <ContactFiles cid={id} />}
       {id && !edit && <MergePerson id={id} name={fullName(c)} />}
+      {id && !edit && <div className="bar"><Err msg={msg} /><span className="grow" /><button className="btn ghost sm" onClick={del}>Slet person</button></div>}
     </>
   );
 }
