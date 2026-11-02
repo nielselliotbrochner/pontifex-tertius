@@ -23,12 +23,12 @@ export default function ContactFiles({ cid }: { cid: string }) {
   const [msg, setMsg] = useState<string | null>(null); const [busy, setBusy] = useState(false);
   useEffect(() => setMsg(null), [cid]);
 
-  async function upload(list: FileList | null) {
-    if (!list?.length) return;
+  async function upload(files: File[]) {
+    if (!files.length) return;
     setBusy(true); setMsg(null);
     const uid = (await supabase.auth.getUser()).data.user?.id;
     if (!uid) { setMsg('Du er ikke logget ind.'); setBusy(false); return; }
-    for (const file of Array.from(list)) {
+    for (const file of files) {
       if (file.size > MAX) { setMsg(`${file.name} er over 25 MB`); continue; }
       const path = `${uid}/${cid}/${crypto.randomUUID()}-${safe(file.name)}`;
       const up = await supabase.storage.from('contact-files').upload(path, file, { contentType: file.type || undefined });
@@ -63,7 +63,7 @@ export default function ContactFiles({ cid }: { cid: string }) {
       )}
       <div className="bar">
         <label className="btn ghost sm" style={{ cursor: 'pointer' }}>{busy ? 'Uploader' : 'Vedhæft fil eller foto'}
-          <input type="file" multiple accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" hidden disabled={busy} onChange={(e) => { upload(e.target.files); e.target.value = ''; }} />
+          <input type="file" multiple accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" hidden disabled={busy} onChange={(e) => { const files = Array.from(e.target.files ?? []); e.target.value = ''; upload(files); }} />
         </label>
         <span className="mute">Op til 25 MB pr. fil. Kun synlig for dig.</span>
       </div>

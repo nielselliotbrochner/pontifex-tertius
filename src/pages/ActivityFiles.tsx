@@ -23,10 +23,10 @@ export default function ActivityFiles({ aid }: { aid: string }) {
   const [msg, setMsg] = useState<string | null>(null); const [busy, setBusy] = useState(false);
   useEffect(() => setMsg(null), [aid]);
 
-  async function upload(list: FileList | null) {
-    if (!list?.length) return;
+  async function upload(files: File[]) {
+    if (!files.length) return;
     setBusy(true); setMsg(null);
-    for (const file of Array.from(list)) {
+    for (const file of files) {
       if (file.size > MAX) { setMsg(`${file.name} er over 25 MB`); continue; }
       const path = `${aid}/${crypto.randomUUID()}-${safe(file.name)}`;
       const up = await supabase.storage.from('activity-files').upload(path, file, { contentType: file.type || undefined });
@@ -61,7 +61,7 @@ export default function ActivityFiles({ aid }: { aid: string }) {
       )}
       <div className="bar">
         <label className="btn ghost sm" style={{ cursor: 'pointer' }}>{busy ? 'Uploader' : 'Vedhæft fil eller foto'}
-          <input type="file" multiple accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" hidden disabled={busy} onChange={(e) => { upload(e.target.files); e.target.value = ''; }} />
+          <input type="file" multiple accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" hidden disabled={busy} onChange={(e) => { const files = Array.from(e.target.files ?? []); e.target.value = ''; upload(files); }} />
         </label>
         <span className="mute">Op til 25 MB pr. fil</span>
       </div>
