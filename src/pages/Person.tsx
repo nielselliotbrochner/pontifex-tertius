@@ -11,7 +11,7 @@ import { CompanyPick, findCompany, useCompanyOpts } from '../lib/CompanyPick';
 type Contact = { id: string; first_name: string; middle_name: string | null; last_name: string | null; email: string | null; phone: string | null; linkedin_url: string | null };
 type Rel = { acquaintance_id: string | null; mobile: string | null; notes: string | null; podcast_relevant: boolean };
 type Act = { id: string; occurred_on: string; title: string; type: { name: string } | null };
-type Aff = { id: string; company_id: string; title: string | null; is_primary: boolean; start_date: string | null; end_date: string | null; company: { name: string } | null; affiliation_type: { name: string } | null; contact_company_level: { level: { name: string; sort_order: number; is_ranked: boolean } | null }[] };
+type Aff = { id: string; company_id: string; affiliation_type_id: string; note: string | null; title: string | null; is_primary: boolean; start_date: string | null; end_date: string | null; company: { name: string } | null; affiliation_type: { name: string } | null; contact_company_level: { level_id: string; level: { name: string; sort_order: number; is_ranked: boolean } | null }[] };
 
 const blank: Contact = { id: '', first_name: '', middle_name: '', last_name: '', email: '', phone: '', linkedin_url: '' };
 const nz = (s: string | null | undefined) => (s && s.trim() ? s.trim() : null);
@@ -23,7 +23,7 @@ export default function Person({ id }: { id: string | null }) {
     const [c, rel, affs, labs, acts, mnt] = await Promise.all([
       supabase.from('contact').select('*').eq('id', id).single(),
       supabase.from('contact_relation').select('acquaintance_id,mobile,notes,podcast_relevant').eq('contact_id', id).maybeSingle(),
-      supabase.from('contact_company').select('id,company_id,title,is_primary,start_date,end_date,company(name),affiliation_type(name),contact_company_level(level(name,sort_order,is_ranked))').eq('contact_id', id).order('end_date', { nullsFirst: true, ascending: false }).order('start_date', { ascending: false, nullsFirst: false }),
+      supabase.from('contact_company').select('id,company_id,affiliation_type_id,note,title,is_primary,start_date,end_date,company(name),affiliation_type(name),contact_company_level(level_id,level(name,sort_order,is_ranked))').eq('contact_id', id).order('end_date', { nullsFirst: true, ascending: false }).order('start_date', { ascending: false, nullsFirst: false }),
       supabase.from('contact_label').select('label_id').eq('contact_id', id),
       supabase.from('activity_participant').select('activity(id,occurred_on,title,type:activity_type(name))').eq('contact_id', id),
       supabase.from('activity_subject').select('activity(id,occurred_on,title,type:activity_type(name))').eq('contact_id', id),
@@ -139,6 +139,7 @@ function Affiliations({ contactId, cur, past, onChange }: { contactId: string; c
   const [lv, setLv] = useState<string[]>([]); const [prim, setPrim] = useState(cur.length === 0);
   const [sd, setSd] = useState(''); const [ed, setEd] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
   async function add() {
     const company = findCompany(co.data ?? [], name);
     if (!company) { setMsg('Vælg en virksomhed fra listen. Opret den først, hvis den ikke findes.'); return; }
@@ -160,7 +161,9 @@ function Affiliations({ contactId, cur, past, onChange }: { contactId: string; c
     if (x.error) setMsg(x.error.message); else onChange();
   };
   const rm = async (a: Aff) => { if (confirm('Fjern tilknytningen?')) { await supabase.from('contact_company').delete().eq('id', a.id); onChange(); } };
-  const row = (a: Aff, active: boolean) => (
+  const row = (a: Aff, active: boolean) => editId === a.id ? (
+    <li key={a.id} style={{ display: 'block' }}><EditAff a={a} contactId={contactId} onDone={() => { setEditId(null); onChange(); }} onCancel={() => setEditId(null)} /></li>
+  ) : (
     <li key={a.id}>
       <span className="grow"><Link view="virksomhed" id={a.company_id}>{a.company?.name}</Link>{a.is_primary && active && <span className="tag" style={{ marginLeft: 8 }}>Primær</span>}
         <div className="mute">{[a.title, a.affiliation_type?.name].filter(Boolean).join(' · ')}</div></span>
@@ -170,6 +173,7 @@ function Affiliations({ contactId, cur, past, onChange }: { contactId: string; c
         <span className="mute">til</span>
         <input type="date" aria-label="Slut" title={active ? 'Tom = stadig tilknyttet' : 'Slut'} defaultValue={a.end_date ?? ''} key={'e' + a.id + a.end_date} onBlur={(e) => e.target.value !== (a.end_date ?? '') && setDates(a, 'end_date', e.target.value)} />
       </span>
+      <button className="btn ghost sm" onClick={() => setEditId(a.id)}>Redigér</button>
       {active && <button className="btn ghost sm" onClick={() => end(a)}>Afslut i dag</button>}
       <button className="btn ghost sm" onClick={() => rm(a)}>Fjern</button>
     </li>
@@ -201,5 +205,45 @@ function Affiliations({ contactId, cur, past, onChange }: { contactId: string; c
         </div>
       ) : <div className="bar"><button className="btn ghost sm" onClick={() => setOpen(true)}>Tilføj tilknytning</button></div>}
     </>
+  );
+}
+
+function EditAff({ a, contactId, onDone, onCancel }: { a: Aff; contactId: string; onDone: () => void; onCancel: () => void }) {
+  const lk = useLookups(); const co = useCompanyOpts();
+  const [name, setName] = useState(a.company?.name ?? ''); const [typ, setTyp] = useState(a.affiliation_type_id);
+  const [title, setTitle] = useState(a.title ?? ''); const [note, setNote] = useState(a.note ?? '');
+  const [lv, setLv] = useState<string[]>(a.contact_company_level.map((l) => l.level_id)); const [prim, setPrim] = useState(a.is_primary);
+  const [msg, setMsg] = useState<string | null>(null); const [busy, setBusy] = useState(false);
+  async function save() {
+    setBusy(true); setMsg(null);
+    const company = name === a.company?.name ? { id: a.company_id } : findCompany(co.data ?? [], name);
+    if (!company) { setMsg('Vælg en virksomhed fra listen. Opret den først, hvis den ikke findes.'); setBusy(false); return; }
+    const makePrimary = prim && !a.end_date;
+    if (makePrimary && !a.is_primary) await supabase.from('contact_company').update({ is_primary: false }).eq('contact_id', contactId).eq('is_primary', true);
+    const x = await supabase.from('contact_company').update({ company_id: company.id, affiliation_type_id: typ, title: title.trim() || null, note: note.trim() || null, is_primary: makePrimary }).eq('id', a.id);
+    if (x.error) { setMsg(x.error.message); setBusy(false); return; }
+    const old = a.contact_company_level.map((l) => l.level_id);
+    const rem = old.filter((id) => !lv.includes(id)); const add = lv.filter((id) => !old.includes(id));
+    if (rem.length) { const d = await supabase.from('contact_company_level').delete().eq('contact_company_id', a.id).in('level_id', rem); if (d.error) { setMsg(d.error.message); setBusy(false); return; } }
+    if (add.length) { const i = await supabase.from('contact_company_level').insert(add.map((level_id) => ({ contact_company_id: a.id, level_id }))); if (i.error) { setMsg(i.error.message); setBusy(false); return; } }
+    setBusy(false); onDone();
+  }
+  return (
+    <div className="panel">
+      <Err msg={msg} />
+      <div className="grid">
+        <Field label="Virksomhed"><CompanyPick value={name} onChange={setName} options={co.data ?? []} listId={'co-edit-' + a.id} /></Field>
+        <Field label="Type"><select value={typ} onChange={(e) => setTyp(e.target.value)}>{lk.data?.affiliation_type.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select></Field>
+        <Field label="Titel (fri tekst)" wide><input value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
+        <Field label="Niveau (flere kan vælges)" wide>
+          <div>{lk.data?.level.map((o) => <label className="check" key={o.id} style={{ display: 'inline-flex', marginRight: 16 }}>
+            <input type="checkbox" checked={lv.includes(o.id)} onChange={(e) => setLv(e.target.checked ? [...lv, o.id] : lv.filter((x) => x !== o.id))} />
+            {o.is_ranked ? o.sort_order + ' ' : ''}{o.name}</label>)}</div>
+        </Field>
+        <Field label="Note" wide><input value={note} onChange={(e) => setNote(e.target.value)} /></Field>
+        {!a.end_date && <label className="check"><input type="checkbox" checked={prim} onChange={(e) => setPrim(e.target.checked)} /> Primær tilknytning</label>}
+      </div>
+      <div className="bar"><button className="btn" disabled={busy} onClick={save}>Gem</button><button className="btn ghost" onClick={onCancel}>Annuller</button></div>
+    </div>
   );
 }
