@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAsync } from '../lib/useAsync';
-import { Err } from '../lib/ui';
+import { Err, TEXT_SIZES, useTextSize } from '../lib/ui';
 
 type Row = { id: string; code: string; name: string; sort_order: number; active: boolean; is_system: boolean; is_ranked?: boolean };
 const LISTS: { t: string; label: string; hint: string; ranked?: boolean }[] = [
@@ -24,6 +24,7 @@ export default function Admin() {
     return r.data as Row[];
   }, [t]);
   const [msg, setMsg] = useState<string | null>(null); const [nn, setNn] = useState('');
+  const [size, setSize] = useTextSize();
   const run = async (p: PromiseLike<{ error: { message: string } | null }>) => { setMsg(null); const r = await p; if (r.error) setMsg(r.error.message.includes('foreign key') ? 'Værdien er i brug. Skjul den i stedet for at slette.' : r.error.message); reload(); };
   const upd = (id: string, v: Partial<Row>) => run(supabase.from(t).update(v).eq('id', id));
   const add = async () => { const max = Math.max(0, ...(data ?? []).map((x) => x.sort_order)); await run(supabase.from(t).insert({ code: slug(nn), name: nn.trim(), sort_order: max + 1 })); setNn(''); };
@@ -35,6 +36,12 @@ export default function Admin() {
   return (
     <>
       <h1>Admin</h1>
+      <h2>Visning</h2>
+      <p className="mute" style={{ marginTop: 0 }}>Tekststørrelse i sidernes indhold. Menuen øverst og nederst ændres ikke. Valget gemmes på denne enhed.</p>
+      <div className="bar" role="radiogroup" aria-label="Tekststørrelse">
+        {TEXT_SIZES.map((x) => <button key={x.k} role="radio" aria-checked={size === x.k} className={'btn sm ' + (size === x.k ? '' : 'ghost')} onClick={() => setSize(x.k)}>{x.label}</button>)}
+      </div>
+      <h2>Lister</h2>
       <p className="sub">Vedligehold de lister, der bruges som valgmuligheder.</p>
       <div className="bar" role="tablist">{LISTS.map((l) => <button key={l.t} className={'btn sm ' + (l.t === t ? '' : 'ghost')} onClick={() => setT(l.t)}>{l.label}</button>)}</div>
       <p className="mute">{cur.hint}</p>

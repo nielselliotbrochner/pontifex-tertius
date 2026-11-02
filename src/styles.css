@@ -124,6 +124,21 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .gh { display: flex; align-items: center; gap: 8px; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 6px; }
 .chip { background: transparent; border: 1px solid var(--line); padding: 3px 8px; margin: 0 6px 6px 0; font-size: 12px; cursor: pointer; }
 .chip:hover { border-color: var(--ink); }
+/* Tekststørrelse for indhold: Stor (som før), Mellem, Lille. Topbar og bundmenu skaleres ikke. */
+:root { --s: 1; }
+:root[data-size="m"] { --s: .92; }
+:root[data-size="s"] { --s: .85; }
+.main { font-size: calc(14px * var(--s)); }
+h1 { font-size: calc(22px * var(--s)); }
+h2 { font-size: calc(11px * var(--s)); }
+input, select, textarea { font-size: calc(13px * var(--s)); }
+.btn { font-size: calc(11px * var(--s)); }
+.btn.sm { font-size: calc(10px * var(--s)); }
+th, .field > span, .gh, .netstats { font-size: calc(10px * var(--s)); }
+.tag, .dm, .kpis span { font-size: calc(9px * var(--s)); }
+.kpis b { font-size: calc(24px * var(--s)); }
+.sub, .check, .err { font-size: calc(13px * var(--s)); }
+.rank, .chip, .legend .check .grow, .legend.key li, .dates input { font-size: calc(12px * var(--s)); }
 .tabbar { display: none; }
 @media (max-width: 1050px) { .brand .t { display: none; } .tab { padding: 7px 10px; } }
 @media (max-width: 860px) { .net { grid-template-columns: 1fr; } .netwrap { height: 56vh; } }

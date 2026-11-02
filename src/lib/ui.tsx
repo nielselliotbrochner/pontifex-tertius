@@ -20,5 +20,14 @@ export function useTheme(): [string, () => void] {
   return [t, () => { const n = t === 'dark' ? 'light' : 'dark'; setT(n); try { localStorage.setItem('theme', n); } catch { /* ignoreres */ } }];
 }
 
+export type TextSize = 'l' | 'm' | 's';
+export const TEXT_SIZES: { k: TextSize; label: string }[] = [{ k: 'l', label: 'Stor' }, { k: 'm', label: 'Mellem' }, { k: 's', label: 'Lille' }];
+// Tekststørrelse for sidernes indhold. Gemmes pr. enhed i browseren.
+export function useTextSize(): [TextSize, (s: TextSize) => void] {
+  const [s, setS] = useState<TextSize>(() => (document.documentElement.dataset.size as TextSize) || 'l');
+  const set = (n: TextSize) => { setS(n); document.documentElement.dataset.size = n; try { localStorage.setItem('size', n); } catch { /* ignoreres */ } };
+  return [s, set];
+}
+
 export const fullName = (c: { first_name: string | null; middle_name?: string | null; last_name: string | null }) =>
   [c.first_name, c.middle_name, c.last_name].filter(Boolean).join(' ');
