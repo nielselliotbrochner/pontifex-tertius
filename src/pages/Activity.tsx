@@ -48,6 +48,9 @@ export default function Activity({ id }: { id: string | null }) {
 
   async function save() {
     setMsg(null);
+    try { await doSave(); } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+  }
+  async function doSave() {
     const payload = { type_id: a.type_id, occurred_on: a.occurred_on, title: a.title.trim(), body: nz(a.body), location: nz(a.location), owner_present: a.owner_present, visibility: a.visibility };
     const res = id ? await supabase.from('activity').update(payload).eq('id', id).select('id').single() : await supabase.from('activity').insert(payload).select('id').single();
     if (res.error) { setMsg(res.error.message); return; }
@@ -102,8 +105,10 @@ export default function Activity({ id }: { id: string | null }) {
           <Picker people={ppl.data} onPick={(p) => !curSj.includes(p.id) && setSj([...curSj, p.id])} listId="pp-sj" placeholder="Tilføj omtalt person" />
           <div className="bar"><input className="grow" list="co-sc" placeholder="Tilføj omtalt virksomhed" value="" onChange={(e) => { const m = cos.data!.find((c) => c.name === e.target.value); if (m && !curSc.includes(m.id)) setSc([...curSc, m.id]); }} /><datalist id="co-sc">{cos.data.map((c) => <option key={c.id} value={c.name} />)}</datalist></div>
           {id ? <ActivityFiles aid={id} /> : <p className="mute">Gem aktiviteten først, så kan du vedhæfte filer og fotos.</p>}
+          <Err msg={msg} />
           <div className="bar">
             <button className="btn" disabled={!a.title.trim() || !a.type_id} onClick={save}>Gem</button>
+            {!a.title.trim() && <span className="mute">Titel mangler</span>}{!a.type_id && <span className="mute">Vælg en type</span>}
             <button className="btn ghost" onClick={() => (id ? (setEdit(false), setF(null), setParts(null), setSj(null), setSc(null)) : go('aktiviteter'))}>Annuller</button>
             <span className="grow" />{id && <button className="btn ghost" onClick={del}>Slet</button>}
           </div>
@@ -139,11 +144,13 @@ function Picker({ people, onPick, listId, placeholder }: { people: PickPerson[];
 function Followups({ aid, fus, users, onChange }: { aid: string; fus: Fu[]; users: { user_id: string; display_name: string | null }[]; onChange: () => void }) {
   const [text, setText] = useState(''); const [due, setDue] = useState(''); const [who, setWho] = useState('');
   const name = (u: string | null) => users.find((x) => x.user_id === u)?.display_name ?? '';
-  async function add() { await supabase.from('activity_followup').insert({ activity_id: aid, text: text.trim(), due_on: due || null, assigned_to: who || undefined }); setText(''); setDue(''); onChange(); }
+  const [fe, setFe] = useState<string | null>(null);
+  async function add() { const x = await supabase.from('activity_followup').insert({ activity_id: aid, text: text.trim(), due_on: due || null, assigned_to: who || undefined }); if (x.error) { setFe(x.error.message); return; } setFe(null); setText(''); setDue(''); onChange(); }
   const toggle = async (f: Fu) => { await supabase.from('activity_followup').update({ done_at: f.done_at ? null : new Date().toISOString() }).eq('id', f.id); onChange(); };
   return (
     <>
       <h2>Opfølgning</h2>
+      <Err msg={fe} />
       {fus.length === 0 && <p className="mute">Ingen opfølgninger.</p>}
       <ul className="list">{fus.map((f) => (
         <li key={f.id}><label className="check grow"><input type="checkbox" checked={!!f.done_at} onChange={() => toggle(f)} /><span style={f.done_at ? { textDecoration: 'line-through' } : undefined}>{f.text}</span></label>
