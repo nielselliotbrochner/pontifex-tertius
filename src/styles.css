@@ -30,6 +30,8 @@ h2 { font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: upperc
 .tab.on { background: var(--red); color: #000; font-weight: 600; }
 .top .sp { flex: 1; }
 .tb { background: transparent; border: 1px solid rgba(245,240,239,.3); color: #F5F0EF; padding: 7px 12px; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.tb { text-decoration: none; display: inline-block; }
+.tb.adm { display: none; }
 .tb:hover { background: #F5F0EF; color: #000; }
 
 .main { background: var(--paper); border: 1px solid var(--line); max-width: 1180px; margin: 20px auto 72px; padding: 28px 32px 56px; }
@@ -145,6 +147,8 @@ th, .field > span, .gh, .netstats { font-size: calc(10px * var(--s)); }
 @media (max-width: 760px) {
   .top { padding: 0 12px; gap: 10px; }
   .brand .t, .tabs { display: none; }
+  .top .sp { flex: 1; }
+  .tb.adm { display: inline-block; }
   .main { margin: 0 0 64px; border-left: 0; border-right: 0; padding: 20px 16px 40px; }
   h2 { margin-left: -16px; margin-right: -16px; padding-left: 16px; padding-right: 16px; }
   .tabbar { display: flex; position: fixed; bottom: 0; left: 0; right: 0; background: #000; padding: 0 0 env(safe-area-inset-bottom); z-index: 5; overflow-x: auto; }

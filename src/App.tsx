@@ -81,6 +81,7 @@ export default function App() {
           {NAV.map(([v, l, set]) => <Link key={v} view={v} className={'tab' + (set.includes(r.view) ? ' on' : '')}>{l}</Link>)}
         </nav>
         <span className="sp" />
+        <Link view="admin" className="tb adm">Admin</Link>
         <button className="tb" onClick={toggle}>{theme === 'dark' ? 'Lys' : 'Mørk'}</button>
         <button className="tb" onClick={() => supabase.auth.signOut()}>Log ud</button>
       </header>
