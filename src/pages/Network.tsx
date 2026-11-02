@@ -7,22 +7,23 @@ import { Link, Err, fullName } from '../lib/ui';
 import { buildGraph, KINDS, type GEdge, type GNode, type Kind, type Raw } from '../lib/graph';
 
 type Ov = { contact_id: string; first_name: string; middle_name: string | null; last_name: string | null; company_name: string | null; rank: number | null; is_decision_maker: boolean | null };
-const ALL: Record<Kind, boolean> = { current: true, former: true, together: true, mentionedPerson: true, mentionedCompany: true };
-const NONE: Record<Kind, boolean> = { current: false, former: false, together: false, mentionedPerson: false, mentionedCompany: false };
+const ALL: Record<Kind, boolean> = { current: true, former: true, group: true, together: true, mentionedPerson: true, mentionedCompany: true };
+const NONE: Record<Kind, boolean> = { current: false, former: false, group: false, together: false, mentionedPerson: false, mentionedCompany: false };
 const radius = (n: GNode) => (n.type === 'c' ? 8 : n.dm ? 7 : 5);
 const kindIdx = (k: Kind) => KINDS.findIndex((x) => x.k === k);
 
 export default function Network() {
   const { data: raw, error, loading } = useAsync<Raw>(async () => {
-    const [p, c, a, pa, su, ac] = await Promise.all([
+    const [p, c, a, pa, su, ac, ow] = await Promise.all([
       fetchAll<Ov>((f, t) => supabase.from('v_contact_overview').select('contact_id,first_name,middle_name,last_name,company_name,rank,is_decision_maker').eq('active', true).order('contact_id').range(f, t)),
       fetchAll<{ id: string; name: string }>((f, t) => supabase.from('company').select('id,name').order('id').range(f, t)),
       fetchAll<Raw['affs'][number]>((f, t) => supabase.from('contact_company').select('contact_id,company_id,end_date').order('id').range(f, t)),
       fetchAll<Raw['parts'][number]>((f, t) => supabase.from('activity_participant').select('activity_id,contact_id').order('activity_id').order('contact_id').range(f, t)),
       fetchAll<Raw['subjects'][number]>((f, t) => supabase.from('activity_subject').select('activity_id,contact_id').order('activity_id').order('contact_id').range(f, t)),
       fetchAll<Raw['acos'][number]>((f, t) => supabase.from('activity_company').select('activity_id,company_id').order('activity_id').order('company_id').range(f, t)),
+      fetchAll<Raw['own'][number]>((f, t) => supabase.from('company_ownership').select('owner_company_id,owned_company_id,is_main').order('id').range(f, t)),
     ]);
-    return { persons: p.map((x) => ({ id: x.contact_id, name: fullName(x), company: x.company_name, rank: x.rank, dm: !!x.is_decision_maker })), companies: c, affs: a, parts: pa, subjects: su, acos: ac };
+    return { persons: p.map((x) => ({ id: x.contact_id, name: fullName(x), company: x.company_name, rank: x.rank, dm: !!x.is_decision_maker })), companies: c, affs: a, parts: pa, subjects: su, acos: ac, own: ow };
   }, [], 'network');
 
   const [on, setOn] = useState<Record<Kind, boolean>>(ALL);
@@ -31,7 +32,7 @@ export default function Network() {
   const [q, setQ] = useState('');
 
   const counts = useMemo(() => {
-    const c: Record<Kind, number> = { current: 0, former: 0, together: 0, mentionedPerson: 0, mentionedCompany: 0 };
+    const c: Record<Kind, number> = { current: 0, former: 0, group: 0, together: 0, mentionedPerson: 0, mentionedCompany: 0 };
     if (!raw) return c;
     for (const e of buildGraph(raw, ALL, { dmOnly, isolated: false }).edges) c[e.kind]++;
     return c;
@@ -60,7 +61,7 @@ export default function Network() {
     const nodes = graph.nodes; nodesRef.current = nodes;
     nodes.forEach((n, i) => { const p = pos.current.get(n.id); if (p) { n.x = p.x; n.y = p.y; } else { const a = i * 2.4; n.x = Math.cos(a) * (20 + i * 3); n.y = Math.sin(a) * (20 + i * 3); } });
     const s = forceSimulation<GNode>(nodes)
-      .force('link', forceLink<GNode, GEdge>(graph.edges).id((n) => n.id).distance((e) => (e.kind === 'current' || e.kind === 'former' ? 46 : 80)).strength(0.5))
+      .force('link', forceLink<GNode, GEdge>(graph.edges).id((n) => n.id).distance((e) => (e.kind === 'current' || e.kind === 'former' || e.kind === 'group' ? 46 : 80)).strength(0.5))
       .force('charge', forceManyBody().strength(-70))
       .force('center', forceCenter(0, 0).strength(0.05))
       .force('collide', forceCollide<GNode>((n) => radius(n) + 5))
@@ -145,7 +146,7 @@ export default function Network() {
             </li>))}</ul>
           <div className="bar">
             <button className="btn ghost sm" onClick={() => setOn(ALL)}>Alle</button>
-            <button className="btn ghost sm" onClick={() => setOn({ ...NONE, current: true, former: true })}>Virksomhed</button>
+            <button className="btn ghost sm" onClick={() => setOn({ ...NONE, current: true, former: true, group: true })}>Virksomhed</button>
             <button className="btn ghost sm" onClick={() => setOn({ ...NONE, mentionedPerson: true, mentionedCompany: true })}>Omtale</button>
             <button className="btn ghost sm" onClick={() => setOn(NONE)}>Ingen</button>
           </div>
@@ -202,6 +203,14 @@ function Detail({ sel, graph, byId, onSelect }: { sel: GNode | null; graph: { no
       const what = kd.k === 'mentionedPerson' ? 'person' : 'virksomhed';
       if (out.length) rows.push({ title: `Har omtalt ${what === 'person' ? 'personer' : 'virksomheder'}`, k: kd.k, ids: out.map((e) => ({ id: e.b, x: e.w > 1 ? `×${e.w}` : undefined })) });
       if (inn.length) rows.push({ title: sel.type === 'c' ? 'Omtalt af' : 'Omtalt af', k: kd.k, ids: inn.map((e) => ({ id: e.a, x: e.w > 1 ? `×${e.w}` : undefined })) });
+    } else if (kd.k === 'group') {
+      if (sel.type === 'p') {
+        for (const e of es) {
+          const cn = e.a === sel.id ? e.b : e.a;
+          const others = graph.edges.filter((x) => x.kind === 'group' && (x.a === cn || x.b === cn)).map((x) => ({ id: x.a === cn ? x.b : x.a })).filter((x) => x.id !== sel.id);
+          rows.push({ title: `${kd.label} · ${byId.get(cn)?.label ?? ''}`, k: kd.k, ids: others });
+        }
+      } else rows.push({ title: kd.label, k: kd.k, ids: es.map((e) => ({ id: e.a === sel.id ? e.b : e.a })) });
     } else if (kd.k === 'current' || kd.k === 'former') {
       if (sel.type === 'p') {
         for (const e of es) {
