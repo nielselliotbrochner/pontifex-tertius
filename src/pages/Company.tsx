@@ -52,8 +52,8 @@ export default function Company({ id }: { id: string | null }) {
     const payload = { name: c.name.trim(), cvr: nz(c.cvr), website: nz(c.website), type_id: c.type_id || null, sector_id: c.sector_id || null };
     const res = id ? await supabase.from('company').update(payload).eq('id', id).select('id').single() : await supabase.from('company').insert(payload).select('id').single();
     if (res.error) { setMsg(res.error.message.includes('company_cvr_uq') ? 'CVR-nummeret findes allerede.' : res.error.message); return; }
-    const cid = res.data.id as string; const want = bsel ?? data.mine;
-    const rem = data.mine.filter((b) => !want.includes(b)); const add = want.filter((b) => !data.mine.includes(b));
+    const cid = res.data.id as string; const mine0 = data!.mine; const want = bsel ?? mine0;
+    const rem = mine0.filter((b) => !want.includes(b)); const add = want.filter((b) => !mine0.includes(b));
     if (rem.length) { const d = await supabase.from('company_branch').delete().eq('company_id', cid).in('branch_id', rem); if (d.error) { setMsg(d.error.message); return; } }
     if (add.length) { const i = await supabase.from('company_branch').insert(add.map((branch_id) => ({ company_id: cid, branch_id }))); if (i.error) { setMsg(i.error.message); return; } }
     setEdit(false); setF(null); setBsel(null); reload(); go('virksomhed', cid);
