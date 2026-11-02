@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAsync } from '../lib/useAsync';
 import { go } from '../lib/nav';
 import { Link, Err, Field } from '../lib/ui';
+import { useCompanyOpts } from '../lib/CompanyPick';
 import { useLookups } from '../lib/lookups';
 import { usePeople, type PickPerson } from '../lib/people';
 
@@ -13,29 +14,35 @@ const today = () => new Date().toISOString().slice(0, 10);
 const nz = (s: string | null | undefined) => (s && s.trim() ? s.trim() : null);
 
 export default function Activity({ id }: { id: string | null }) {
-  const lk = useLookups(); const ppl = usePeople();
+  const lk = useLookups(); const ppl = usePeople(); const cos = useCompanyOpts();
   const { data, error, loading, reload } = useAsync(async () => {
-    if (!id) return { a: null as A | null, parts: [] as Part[], fus: [] as Fu[], users: [] as { user_id: string; display_name: string | null }[] };
-    const [a, p, f, u] = await Promise.all([
+    if (!id) return { a: null as A | null, parts: [] as Part[], fus: [] as Fu[], subj: [] as string[], subc: [] as string[], users: [] as { user_id: string; display_name: string | null }[] };
+    const [a, p, f, u, sp, sc] = await Promise.all([
       supabase.from('activity').select('*').eq('id', id).single(),
       supabase.from('activity_participant').select('contact_id,company_id').eq('activity_id', id),
       supabase.from('activity_followup').select('id,text,due_on,done_at,assigned_to').eq('activity_id', id).order('created_at'),
       supabase.from('app_user').select('user_id,display_name').eq('active', true),
+      supabase.from('activity_subject').select('contact_id').eq('activity_id', id),
+      supabase.from('activity_company').select('company_id').eq('activity_id', id),
     ]);
     if (a.error) throw a.error;
-    return { a: a.data as A, parts: (p.data ?? []) as Part[], fus: (f.data ?? []) as Fu[], users: (u.data ?? []) as { user_id: string; display_name: string | null }[] };
+    return { a: a.data as A, parts: (p.data ?? []) as Part[], fus: (f.data ?? []) as Fu[], subj: (sp.data ?? []).map((x: { contact_id: string }) => x.contact_id), subc: (sc.data ?? []).map((x: { company_id: string }) => x.company_id), users: (u.data ?? []) as { user_id: string; display_name: string | null }[] };
   }, [id]);
   const [edit, setEdit] = useState(!id);
   const [f, setF] = useState<A | null>(null);
   const [parts, setParts] = useState<Part[] | null>(null);
+  const [sj, setSj] = useState<string[] | null>(null);
+  const [sc, setSc] = useState<string[] | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   if (error) return <Err msg={error} />;
-  if (loading || !data || !lk.data || !ppl.data) return <p className="mute">Henter</p>;
+  if (loading || !data || !lk.data || !ppl.data || !cos.data) return <p className="mute">Henter</p>;
   const blank: A = { id: '', type_id: lk.data.activity_type.find((t) => t.name === 'Kaffemøde')?.id ?? lk.data.activity_type[0]?.id ?? '', occurred_on: today(), title: '', body: '', location: '', owner_present: true, visibility: 'shared' };
   const a = f ?? data.a ?? blank; const cur = parts ?? data.parts;
   const set = <K extends keyof A>(k: K, v: A[K]) => setF({ ...a, [k]: v });
   const byId = new Map(ppl.data.map((p) => [p.id, p]));
   const typeName = lk.data.activity_type.find((t) => t.id === a.type_id)?.name;
+  const curSj = sj ?? data.subj; const curSc = sc ?? data.subc;
+  const coName = new Map(cos.data.map((c) => [c.id, c.name]));
   const mine = cur.filter((p) => byId.get(p.contact_id)?.own); const others = cur.filter((p) => !byId.get(p.contact_id)?.own);
 
   async function save() {
@@ -46,7 +53,11 @@ export default function Activity({ id }: { id: string | null }) {
     const aid = res.data.id as string;
     await supabase.from('activity_participant').delete().eq('activity_id', aid);
     if (cur.length) { const x = await supabase.from('activity_participant').insert(cur.map((p) => ({ activity_id: aid, contact_id: p.contact_id, company_id: p.company_id }))); if (x.error) { setMsg(x.error.message); return; } }
-    setEdit(false); setF(null); setParts(null); reload(); go('aktivitet', aid);
+    await supabase.from('activity_subject').delete().eq('activity_id', aid);
+    if (curSj.length) { const x = await supabase.from('activity_subject').insert(curSj.map((c) => ({ activity_id: aid, contact_id: c }))); if (x.error) { setMsg(x.error.message); return; } }
+    await supabase.from('activity_company').delete().eq('activity_id', aid);
+    if (curSc.length) { const x = await supabase.from('activity_company').insert(curSc.map((c) => ({ activity_id: aid, company_id: c }))); if (x.error) { setMsg(x.error.message); return; } }
+    setEdit(false); setF(null); setParts(null); setSj(null); setSc(null); reload(); go('aktivitet', aid);
   }
   async function del() {
     if (!id || !confirm('Slet aktiviteten?')) return;
@@ -81,9 +92,17 @@ export default function Activity({ id }: { id: string | null }) {
           <ul className="list">{mine.map((p) => chip(p, true))}</ul>
           <Picker people={ppl.data.filter((p) => p.own)} onPick={add} listId="pp-own" placeholder="Tilføj kollega" />
           {ppl.data.every((p) => !p.own) && <p className="mute">Ingen kolleger oprettet endnu. Opret dem som personer med tilknytning til NIRAS.</p>}
+          <h2>Omtalt</h2>
+          <p className="mute">Personer og virksomheder, aktiviteten handler om, men som ikke var til stede.</p>
+          <ul className="list">
+            {curSj.map((c) => <li key={c}><span className="grow">{byId.get(c)?.label ?? '…'}</span><button className="btn ghost sm" onClick={() => setSj(curSj.filter((x) => x !== c))}>Fjern</button></li>)}
+            {curSc.map((c) => <li key={c}><span className="grow">{coName.get(c) ?? '…'}</span><span className="tag">Virksomhed</span><button className="btn ghost sm" onClick={() => setSc(curSc.filter((x) => x !== c))}>Fjern</button></li>)}
+          </ul>
+          <Picker people={ppl.data} onPick={(p) => !curSj.includes(p.id) && setSj([...curSj, p.id])} listId="pp-sj" placeholder="Tilføj omtalt person" />
+          <div className="bar"><input className="grow" list="co-sc" placeholder="Tilføj omtalt virksomhed" value="" onChange={(e) => { const m = cos.data!.find((c) => c.name === e.target.value); if (m && !curSc.includes(m.id)) setSc([...curSc, m.id]); }} /><datalist id="co-sc">{cos.data.map((c) => <option key={c.id} value={c.name} />)}</datalist></div>
           <div className="bar">
             <button className="btn" disabled={!a.title.trim() || !a.type_id} onClick={save}>Gem</button>
-            <button className="btn ghost" onClick={() => (id ? (setEdit(false), setF(null), setParts(null)) : go('aktiviteter'))}>Annuller</button>
+            <button className="btn ghost" onClick={() => (id ? (setEdit(false), setF(null), setParts(null), setSj(null), setSc(null)) : go('aktiviteter'))}>Annuller</button>
             <span className="grow" />{id && <button className="btn ghost" onClick={del}>Slet</button>}
           </div>
         </>
@@ -96,6 +115,10 @@ export default function Activity({ id }: { id: string | null }) {
             <div><h2>Deltagere</h2>{others.length ? <ul className="list">{others.map((p) => chip(p, false))}</ul> : <p className="mute">Ingen registreret.</p>}</div>
             <div><h2>Fra NIRAS</h2>{mine.length ? <ul className="list">{mine.map((p) => chip(p, false))}</ul> : <p className="mute">Ingen registreret.</p>}</div>
           </div>
+          {(data.subj.length > 0 || data.subc.length > 0) && (<><h2>Omtalt</h2><ul className="list">
+            {data.subj.map((c) => <li key={c}><Link view="person" id={c}>{byId.get(c)?.name ?? '…'}</Link><span className="mute">{byId.get(c)?.company_name}</span></li>)}
+            {data.subc.map((c) => <li key={c}><Link view="virksomhed" id={c}>{coName.get(c) ?? '…'}</Link><span className="tag">Virksomhed</span></li>)}
+          </ul></>)}
           <Followups aid={id!} fus={data.fus} users={data.users} onChange={reload} />
         </>
       )}

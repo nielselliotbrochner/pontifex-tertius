@@ -17,17 +17,19 @@ const nz = (s: string | null | undefined) => (s && s.trim() ? s.trim() : null);
 export default function Person({ id }: { id: string | null }) {
   const lk = useLookups();
   const { data, error, loading, reload } = useAsync(async () => {
-    if (!id) return { c: blank, rel: { acquaintance_id: null, mobile: '', notes: '', podcast_relevant: false } as Rel, affs: [] as Aff[], labels: [] as string[], activities: [] as Act[] };
-    const [c, rel, affs, labs, acts] = await Promise.all([
+    if (!id) return { c: blank, rel: { acquaintance_id: null, mobile: '', notes: '', podcast_relevant: false } as Rel, affs: [] as Aff[], labels: [] as string[], activities: [] as Act[], mentioned: [] as Act[] };
+    const [c, rel, affs, labs, acts, mnt] = await Promise.all([
       supabase.from('contact').select('*').eq('id', id).single(),
       supabase.from('contact_relation').select('acquaintance_id,mobile,notes,podcast_relevant').eq('contact_id', id).maybeSingle(),
       supabase.from('contact_company').select('id,company_id,title,is_primary,end_date,company(name),affiliation_type(name),contact_company_level(level(name,sort_order,is_ranked))').eq('contact_id', id).order('end_date', { nullsFirst: true }),
       supabase.from('contact_label').select('label_id').eq('contact_id', id),
       supabase.from('activity_participant').select('activity(id,occurred_on,title,type:activity_type(name))').eq('contact_id', id),
+      supabase.from('activity_subject').select('activity(id,occurred_on,title,type:activity_type(name))').eq('contact_id', id),
     ]);
     if (c.error) throw c.error;
+    const mentioned = ((mnt.data ?? []) as unknown as { activity: Act | null }[]).map((x) => x.activity).filter((a): a is Act => !!a).sort((a, b) => b.occurred_on.localeCompare(a.occurred_on));
     const activities = ((acts.data ?? []) as unknown as { activity: Act | null }[]).map((x) => x.activity).filter((a): a is Act => !!a).sort((a, b) => b.occurred_on.localeCompare(a.occurred_on));
-    return { c: c.data as Contact, rel: (rel.data ?? { acquaintance_id: null, mobile: '', notes: '', podcast_relevant: false }) as Rel, affs: (affs.data ?? []) as unknown as Aff[], labels: (labs.data ?? []).map((x: { label_id: string }) => x.label_id), activities };
+    return { c: c.data as Contact, rel: (rel.data ?? { acquaintance_id: null, mobile: '', notes: '', podcast_relevant: false }) as Rel, affs: (affs.data ?? []) as unknown as Aff[], labels: (labs.data ?? []).map((x: { label_id: string }) => x.label_id), activities, mentioned };
   }, [id]);
   const [edit, setEdit] = useState(!id);
   const [f, setF] = useState<Contact | null>(null);
@@ -116,7 +118,8 @@ export default function Person({ id }: { id: string | null }) {
         </>
       )}
       {id && !edit && (<><h2>Aktiviteter</h2>{data.activities.length === 0 ? <p className="mute">Ingen aktiviteter.</p> :
-        <ul className="list">{data.activities.map((a) => <li key={a.id}><span className="mute" style={{ minWidth: 92 }}>{a.occurred_on}</span><span className="grow">{a.title}</span><span className="tag">{a.type?.name}</span></li>)}</ul>}</>)}
+        <ul className="list">{data.activities.map((a) => <li key={a.id}><span className="mute" style={{ minWidth: 92 }}>{a.occurred_on}</span><span className="grow"><Link view="aktivitet" id={a.id}>{a.title}</Link></span><span className="tag">{a.type?.name}</span></li>)}</ul>}
+        {data.mentioned.length > 0 && (<><h2>Omtalt i</h2><ul className="list">{data.mentioned.map((a) => <li key={a.id}><span className="mute" style={{ minWidth: 92 }}>{a.occurred_on}</span><span className="grow"><Link view="aktivitet" id={a.id}>{a.title}</Link></span><span className="tag">{a.type?.name}</span></li>)}</ul></>)}</>)}
       {id && <Affiliations contactId={id} cur={cur} past={past} onChange={reload} />}
     </>
   );

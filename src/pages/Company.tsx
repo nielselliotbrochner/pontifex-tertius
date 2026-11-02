@@ -12,18 +12,24 @@ type Member = { id: string; title: string | null; contact: { id: string; first_n
 const nz = (s: string | null | undefined) => (s && s.trim() ? s.trim() : null);
 const blank: Co = { id: '', name: '', cvr: '', website: '', type_id: null, sector_id: null };
 
+type CAct = { id: string; occurred_on: string; title: string; type: { name: string } | null };
+const ActList = ({ items }: { items: CAct[] }) => <ul className="list">{items.map((a) => <li key={a.id}><span className="mute" style={{ minWidth: 92 }}>{a.occurred_on}</span><span className="grow"><Link view="aktivitet" id={a.id}>{a.title}</Link></span><span className="tag">{a.type?.name}</span></li>)}</ul>;
+
 export default function Company({ id }: { id: string | null }) {
   const lk = useLookups(); const opts = useCompanyOpts();
   const { data, error, loading, reload } = useAsync(async () => {
     const all = await supabase.from('company_ownership').select('id,owner_company_id,owned_company_id,share_pct,is_main').limit(20000);
     if (all.error) throw all.error;
-    if (!id) return { co: blank, own: all.data as Own[], members: [] as Member[] };
-    const [co, mem] = await Promise.all([
+    if (!id) return { co: blank, own: all.data as Own[], members: [] as Member[], acts: [] as CAct[], mentioned: [] as CAct[] };
+    const [co, mem, pa, ac] = await Promise.all([
       supabase.from('company').select('id,name,cvr,website,type_id,sector_id').eq('id', id).single(),
       supabase.from('contact_company').select('id,title,contact(id,first_name,middle_name,last_name),contact_company_level(level(name))').eq('company_id', id).is('end_date', null),
+      supabase.from('activity_participant').select('activity(id,occurred_on,title,type:activity_type(name))').eq('company_id', id),
+      supabase.from('activity_company').select('activity(id,occurred_on,title,type:activity_type(name))').eq('company_id', id),
     ]);
     if (co.error) throw co.error;
-    return { co: co.data as Co, own: all.data as Own[], members: (mem.data ?? []) as unknown as Member[] };
+    const flat = (d: unknown): CAct[] => { const m = new Map<string, CAct>(); for (const x of (d ?? []) as { activity: CAct | null }[]) if (x.activity) m.set(x.activity.id, x.activity); return [...m.values()].sort((a, b) => b.occurred_on.localeCompare(a.occurred_on)); };
+    return { co: co.data as Co, own: all.data as Own[], members: (mem.data ?? []) as unknown as Member[], acts: flat(pa.data), mentioned: flat(ac.data) };
   }, [id]);
   const [edit, setEdit] = useState(!id);
   const [f, setF] = useState<Co | null>(null);
@@ -97,6 +103,9 @@ export default function Company({ id }: { id: string | null }) {
               <li key={m.id}><span className="grow"><Link view="person" id={m.contact.id}>{fullName(m.contact)}</Link><div className="mute">{m.title}</div></span>
                 <span>{m.contact_company_level.map((l) => l.level && <span className="tag" key={l.level.name}>{l.level.name}</span>)}</span></li>))}</ul>
           )}
+          <h2>Aktiviteter</h2>
+          {data.acts.length === 0 ? <p className="mute">Ingen aktiviteter.</p> : <ActList items={data.acts} />}
+          {data.mentioned.length > 0 && (<><h2>Omtalt i</h2><ActList items={data.mentioned} /></>)}
         </>
       )}
     </>
