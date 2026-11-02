@@ -5,6 +5,7 @@ import { go } from '../lib/nav';
 import { Link, Err, Field } from '../lib/ui';
 import { useCompanyOpts } from '../lib/CompanyPick';
 import { useLookups } from '../lib/lookups';
+import ActivityFiles from './ActivityFiles';
 import { usePeople, type PickPerson } from '../lib/people';
 
 type Part = { contact_id: string; company_id: string | null };
@@ -100,6 +101,7 @@ export default function Activity({ id }: { id: string | null }) {
           </ul>
           <Picker people={ppl.data} onPick={(p) => !curSj.includes(p.id) && setSj([...curSj, p.id])} listId="pp-sj" placeholder="Tilføj omtalt person" />
           <div className="bar"><input className="grow" list="co-sc" placeholder="Tilføj omtalt virksomhed" value="" onChange={(e) => { const m = cos.data!.find((c) => c.name === e.target.value); if (m && !curSc.includes(m.id)) setSc([...curSc, m.id]); }} /><datalist id="co-sc">{cos.data.map((c) => <option key={c.id} value={c.name} />)}</datalist></div>
+          {id ? <ActivityFiles aid={id} /> : <p className="mute">Gem aktiviteten først, så kan du vedhæfte filer og fotos.</p>}
           <div className="bar">
             <button className="btn" disabled={!a.title.trim() || !a.type_id} onClick={save}>Gem</button>
             <button className="btn ghost" onClick={() => (id ? (setEdit(false), setF(null), setParts(null), setSj(null), setSc(null)) : go('aktiviteter'))}>Annuller</button>
@@ -119,6 +121,7 @@ export default function Activity({ id }: { id: string | null }) {
             {data.subj.map((c) => <li key={c}><Link view="person" id={c}>{byId.get(c)?.name ?? '…'}</Link><span className="mute">{byId.get(c)?.company_name}</span></li>)}
             {data.subc.map((c) => <li key={c}><Link view="virksomhed" id={c}>{coName.get(c) ?? '…'}</Link><span className="tag">Virksomhed</span></li>)}
           </ul></>)}
+          <ActivityFiles aid={id!} />
           <Followups aid={id!} fus={data.fus} users={data.users} onChange={reload} />
         </>
       )}
