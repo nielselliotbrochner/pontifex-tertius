@@ -141,6 +141,9 @@ th, .field > span, .gh, .netstats { font-size: calc(10px * var(--s)); }
 .kpis b { font-size: calc(24px * var(--s)); }
 .sub, .check, .err { font-size: calc(13px * var(--s)); }
 .rank, .chip, .legend .check .grow, .legend.key li, .dates input { font-size: calc(12px * var(--s)); }
+.sortbtn { background: none; border: 0; padding: 0; margin: 0; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; cursor: pointer; text-align: left; }
+.sortbtn:hover, .sortbtn.on { color: var(--ink); }
+.show-s { display: none; }
 .tabbar { display: none; }
 @media (max-width: 1050px) { .brand .t { display: none; } .tab { padding: 7px 10px; } }
 @media (max-width: 860px) { .net { grid-template-columns: 1fr; } .netwrap { height: 56vh; } }
@@ -160,5 +163,6 @@ th, .field > span, .gh, .netstats { font-size: calc(10px * var(--s)); }
   .bar input.grow { flex: 1 1 100%; }
   .row2 { grid-template-columns: 1fr; }
   .hide-s { display: none; }
+  .show-s { display: block; }
   input, select, textarea { font-size: 16px; }
 }
