@@ -5,11 +5,11 @@ import { Link, Empty, Err, fullName } from '../lib/ui';
 import { useLookups } from '../lib/lookups';
 
 type Row = { podcast?: boolean; label_ids?: string[]; contact_id: string; first_name: string; middle_name: string | null; last_name: string | null; email: string | null; company_name: string | null;
-  title: string | null; labels: string | null; rank: number | null; is_decision_maker: boolean | null; city: string | null };
+  title: string | null; labels: string | null; rank: number | null; is_decision_maker: boolean | null; city: string | null; start_date: string | null };
 
 export default function Persons() {
   const { data, error, loading } = useAsync(async () => {
-    const r = await supabase.from('v_contact_overview').select('contact_id,first_name,middle_name,last_name,email,company_name,title,labels,rank,is_decision_maker,city').eq('active', true).order('last_name').limit(5000);
+    const r = await supabase.from('v_contact_overview').select('contact_id,first_name,middle_name,last_name,email,company_name,title,labels,rank,is_decision_maker,city,start_date').eq('active', true).order('last_name').limit(5000);
     if (r.error) throw r.error;
     const [pod, lab] = await Promise.all([
       supabase.from('contact_relation').select('contact_id').eq('podcast_relevant', true).limit(5000),
@@ -57,7 +57,7 @@ export default function Persons() {
               <tr key={r.contact_id}>
                 <td className="num"><span className="rank">{r.rank ?? ''}</span></td>
                 <td><Link view="person" id={r.contact_id}>{fullName(r)}</Link>{' '}{r.is_decision_maker && <span className="dm">Beslutningstager</span>}</td>
-                <td>{r.company_name ?? <span className="mute">Ingen tilknytning</span>}{r.title && <div className="mute">{r.title}</div>}{r.labels && <div>{r.labels.split(', ').map((l) => <span className="tag" key={l}>{l}</span>)}</div>}</td>
+                <td>{r.company_name ?? <span className="mute">Ingen tilknytning</span>}{(r.title || r.start_date) && <div className="mute">{[r.title, r.start_date && 'siden ' + r.start_date.slice(0, 4)].filter(Boolean).join(' · ')}</div>}{r.labels && <div>{r.labels.split(', ').map((l) => <span className="tag" key={l}>{l}</span>)}</div>}</td>
                 <td className="hide-s">{r.city}</td>
               </tr>
             ))}

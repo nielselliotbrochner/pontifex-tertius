@@ -8,11 +8,13 @@ import { CompanyPick, findCompany, useCompanyOpts } from '../lib/CompanyPick';
 
 type Co = { id: string; name: string; cvr: string | null; website: string | null; type_id: string | null; sector_id: string | null };
 type Own = { id: string; owner_company_id: string; owned_company_id: string; share_pct: number | null; is_main: boolean };
-type Member = { id: string; title: string | null; contact: { id: string; first_name: string; middle_name: string | null; last_name: string | null } | null; contact_company_level: { level: { name: string } | null }[] };
+type Member = { id: string; title: string | null; start_date: string | null; end_date: string | null; contact: { id: string; first_name: string; middle_name: string | null; last_name: string | null } | null; contact_company_level: { level: { name: string } | null }[] };
 const nz = (s: string | null | undefined) => (s && s.trim() ? s.trim() : null);
 const blank: Co = { id: '', name: '', cvr: '', website: '', type_id: null, sector_id: null };
 
 type CAct = { id: string; occurred_on: string; title: string; type: { name: string } | null };
+const yr = (d: string | null) => (d ? d.slice(0, 4) : '');
+const period = (m: { start_date: string | null; end_date: string | null }) => (m.end_date ? `${yr(m.start_date) || '?'} til ${yr(m.end_date)}` : m.start_date ? `Siden ${yr(m.start_date)}` : '');
 const ActList = ({ items }: { items: CAct[] }) => <ul className="list">{items.map((a) => <li key={a.id}><span className="mute" style={{ minWidth: 92 }}>{a.occurred_on}</span><span className="grow"><Link view="aktivitet" id={a.id}>{a.title}</Link></span><span className="tag">{a.type?.name}</span></li>)}</ul>;
 
 export default function Company({ id }: { id: string | null }) {
@@ -23,7 +25,7 @@ export default function Company({ id }: { id: string | null }) {
     if (!id) return { co: blank, own: all.data as Own[], members: [] as Member[], acts: [] as CAct[], mentioned: [] as CAct[] };
     const [co, mem, pa, ac] = await Promise.all([
       supabase.from('company').select('id,name,cvr,website,type_id,sector_id').eq('id', id).single(),
-      supabase.from('contact_company').select('id,title,contact(id,first_name,middle_name,last_name),contact_company_level(level(name))').eq('company_id', id).is('end_date', null),
+      supabase.from('contact_company').select('id,title,start_date,end_date,contact(id,first_name,middle_name,last_name),contact_company_level(level(name))').eq('company_id', id).order('end_date', { ascending: false, nullsFirst: true }).order('start_date', { ascending: false, nullsFirst: false }),
       supabase.from('activity_participant').select('activity(id,occurred_on,title,type:activity_type(name))').eq('company_id', id),
       supabase.from('activity_company').select('activity(id,occurred_on,title,type:activity_type(name))').eq('company_id', id),
     ]);
@@ -98,11 +100,17 @@ export default function Company({ id }: { id: string | null }) {
             <div><h2>Ejer</h2>{kids(id).length ? <Tree cid={id} depth={0} /> : <p className="mute">Ejer ingen virksomheder.</p>}</div>
           </div>
           <h2>Personer</h2>
-          {data.members.length === 0 ? <p className="mute">Ingen aktive personer.</p> : (
-            <ul className="list">{data.members.map((m) => m.contact && (
+          {(() => {
+            const row = (m: Member) => m.contact && (
               <li key={m.id}><span className="grow"><Link view="person" id={m.contact.id}>{fullName(m.contact)}</Link><div className="mute">{m.title}</div></span>
-                <span>{m.contact_company_level.map((l) => l.level && <span className="tag" key={l.level.name}>{l.level.name}</span>)}</span></li>))}</ul>
-          )}
+                <span>{m.contact_company_level.map((l) => l.level && <span className="tag" key={l.level.name}>{l.level.name}</span>)}</span>
+                <span className="mute" style={{ minWidth: 92, textAlign: 'right' }}>{period(m)}</span></li>);
+            const act = data.members.filter((m) => !m.end_date); const old = data.members.filter((m) => m.end_date);
+            return (<>
+              {act.length === 0 ? <p className="mute">Ingen aktive personer.</p> : <ul className="list">{act.map(row)}</ul>}
+              {old.length > 0 && <><h2>Tidligere ansatte og tilknyttede</h2><ul className="list">{old.map(row)}</ul></>}
+            </>);
+          })()}
           <h2>Aktiviteter</h2>
           {data.acts.length === 0 ? <p className="mute">Ingen aktiviteter.</p> : <ActList items={data.acts} />}
           {data.mentioned.length > 0 && (<><h2>Omtalt i</h2><ActList items={data.mentioned} /></>)}
