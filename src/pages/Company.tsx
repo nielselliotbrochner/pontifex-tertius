@@ -22,20 +22,25 @@ export default function Company({ id }: { id: string | null }) {
   const { data, error, loading, reload } = useAsync(async () => {
     const all = await supabase.from('company_ownership').select('id,owner_company_id,owned_company_id,share_pct,is_main').limit(20000);
     if (all.error) throw all.error;
-    if (!id) return { co: blank, own: all.data as Own[], members: [] as Member[], acts: [] as CAct[], mentioned: [] as CAct[] };
-    const [co, mem, pa, ac] = await Promise.all([
+    const brs = await supabase.from('branch').select('id,name').eq('active', true).order('sort_order');
+    if (brs.error) throw brs.error;
+    const br = brs.data as { id: string; name: string }[];
+    if (!id) return { co: blank, own: all.data as Own[], members: [] as Member[], acts: [] as CAct[], mentioned: [] as CAct[], br, mine: [] as string[] };
+    const [co, mem, pa, ac, mb] = await Promise.all([
       supabase.from('company').select('id,name,cvr,website,type_id,sector_id').eq('id', id).single(),
       supabase.from('contact_company').select('id,title,start_date,end_date,contact(id,first_name,middle_name,last_name),contact_company_level(level(name))').eq('company_id', id).order('end_date', { ascending: false, nullsFirst: true }).order('start_date', { ascending: false, nullsFirst: false }),
       supabase.from('activity_participant').select('activity(id,occurred_on,title,type:activity_type(name))').eq('company_id', id),
       supabase.from('activity_company').select('activity(id,occurred_on,title,type:activity_type(name))').eq('company_id', id),
+      supabase.from('company_branch').select('branch_id').eq('company_id', id),
     ]);
     if (co.error) throw co.error;
     const flat = (d: unknown): CAct[] => { const m = new Map<string, CAct>(); for (const x of (d ?? []) as { activity: CAct | null }[]) if (x.activity) m.set(x.activity.id, x.activity); return [...m.values()].sort((a, b) => b.occurred_on.localeCompare(a.occurred_on)); };
-    return { co: co.data as Co, own: all.data as Own[], members: (mem.data ?? []) as unknown as Member[], acts: flat(pa.data), mentioned: flat(ac.data) };
+    return { co: co.data as Co, own: all.data as Own[], members: (mem.data ?? []) as unknown as Member[], acts: flat(pa.data), mentioned: flat(ac.data), br, mine: ((mb.data ?? []) as { branch_id: string }[]).map((x) => x.branch_id) };
   }, [id]);
   const [edit, setEdit] = useState(!id);
   const [f, setF] = useState<Co | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [bsel, setBsel] = useState<string[] | null>(null);
   if (error) return <Err msg={error} />;
   if (loading || !data) return <p className="mute">Henter</p>;
   const c = f ?? data.co;
@@ -47,7 +52,11 @@ export default function Company({ id }: { id: string | null }) {
     const payload = { name: c.name.trim(), cvr: nz(c.cvr), website: nz(c.website), type_id: c.type_id || null, sector_id: c.sector_id || null };
     const res = id ? await supabase.from('company').update(payload).eq('id', id).select('id').single() : await supabase.from('company').insert(payload).select('id').single();
     if (res.error) { setMsg(res.error.message.includes('company_cvr_uq') ? 'CVR-nummeret findes allerede.' : res.error.message); return; }
-    setEdit(false); setF(null); reload(); go('virksomhed', res.data.id as string);
+    const cid = res.data.id as string; const want = bsel ?? data.mine;
+    const rem = data.mine.filter((b) => !want.includes(b)); const add = want.filter((b) => !data.mine.includes(b));
+    if (rem.length) { const d = await supabase.from('company_branch').delete().eq('company_id', cid).in('branch_id', rem); if (d.error) { setMsg(d.error.message); return; } }
+    if (add.length) { const i = await supabase.from('company_branch').insert(add.map((branch_id) => ({ company_id: cid, branch_id }))); if (i.error) { setMsg(i.error.message); return; } }
+    setEdit(false); setF(null); setBsel(null); reload(); go('virksomhed', cid);
   }
   async function del() {
     if (!id || !confirm('Slet virksomheden?')) return;
@@ -85,9 +94,13 @@ export default function Company({ id }: { id: string | null }) {
             <Field label="Type"><select value={c.type_id ?? ''} onChange={(e) => set('type_id', e.target.value || null)}><option value="">Ikke angivet</option>{lk.data?.company_type.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select></Field>
             <Field label="Sektor"><select value={c.sector_id ?? ''} onChange={(e) => set('sector_id', e.target.value || null)}><option value="">Ikke angivet</option>{lk.data?.sector.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select></Field>
           </div>
+          <h2>Brancher</h2>
+          <p className="mute" style={{ marginTop: 0 }}>En virksomhed kan have flere.</p>
+          <div>{data.br.map((b) => { const cur = bsel ?? data.mine; return <label className="check" key={b.id} style={{ display: 'inline-flex', marginRight: 16 }}>
+            <input type="checkbox" checked={cur.includes(b.id)} onChange={(e) => setBsel(e.target.checked ? [...cur, b.id] : cur.filter((x) => x !== b.id))} />{b.name}</label>; })}</div>
           <div className="bar">
             <button className="btn" disabled={!c.name.trim()} onClick={save}>Gem</button>
-            <button className="btn ghost" onClick={() => (id ? (setEdit(false), setF(null)) : go('virksomheder'))}>Annuller</button>
+            <button className="btn ghost" onClick={() => (id ? (setEdit(false), setF(null), setBsel(null)) : go('virksomheder'))}>Annuller</button>
             <span className="grow" />{id && <button className="btn ghost" onClick={del}>Slet</button>}
           </div>
         </>
