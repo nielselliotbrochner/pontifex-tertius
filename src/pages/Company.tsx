@@ -61,11 +61,16 @@ export default function Company({ id }: { id: string | null }) {
     const k = kids(cid);
     if (!k.length || depth > 10) return null;
     return <ul className={'tree' + (depth === 0 ? ' root' : '')}>{k.map((o) => (
-      <li key={o.id}><Link view="virksomhed" id={o.owned_company_id}>{nameOf(o.owned_company_id)}</Link>{' '}
+      <li key={o.id}>{o.owned_company_id === id ? <b>{nameOf(o.owned_company_id)}</b> : <Link view="virksomhed" id={o.owned_company_id}>{nameOf(o.owned_company_id)}</Link>}{' '}
         <span className="mute">{o.share_pct != null ? o.share_pct + ' %' : 'ejerandel ukendt'}{o.is_main ? '' : ' · ikke hovedejer'}</span>
         <Tree cid={o.owned_company_id} depth={depth + 1} /></li>))}</ul>;
   };
 
+  const up = new Map<string, string>();
+  for (const o of data.own) if (!up.has(o.owned_company_id) || o.is_main) up.set(o.owned_company_id, o.owner_company_id);
+  let root = id ?? ''; { const seen = new Set<string>([root]); while (up.has(root)) { const n = up.get(root)!; if (seen.has(n)) break; seen.add(n); root = n; } }
+  const inGroup = !!id && (root !== id || kids(id).length > 0);
+  const countIn = (cid: string, seen = new Set<string>()): number => { if (seen.has(cid)) return 0; seen.add(cid); return 1 + kids(cid).reduce((n, o) => n + countIn(o.owned_company_id, seen), 0); };
   return (
     <>
       <Link view="virksomheder" className="mute">Virksomheder</Link>
@@ -99,6 +104,13 @@ export default function Company({ id }: { id: string | null }) {
             <div><h2>Ejes af</h2><Owners id={id} owners={owners} nameOf={nameOf} options={opts.data ?? []} onChange={() => { reload(); }} /></div>
             <div><h2>Ejer</h2>{kids(id).length ? <Tree cid={id} depth={0} /> : <p className="mute">Ejer ingen virksomheder.</p>}</div>
           </div>
+          {inGroup && (
+            <>
+              <h2>Koncern · {countIn(root)} selskaber</h2>
+              <p className="mute">Alle selskaber under samme øverste ejer. {root === id ? 'Dette selskab er øverst.' : 'Dette selskab står med fed.'}</p>
+              <ul className="tree root"><li>{root === id ? <b>{nameOf(root)}</b> : <Link view="virksomhed" id={root}>{nameOf(root)}</Link>}<Tree cid={root} depth={1} /></li></ul>
+            </>
+          )}
           <h2>Personer</h2>
           {(() => {
             const row = (m: Member) => m.contact && (
