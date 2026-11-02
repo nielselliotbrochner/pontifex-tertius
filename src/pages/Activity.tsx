@@ -103,7 +103,7 @@ export default function Activity({ id }: { id: string | null }) {
             {curSc.map((c) => <li key={c}><span className="grow">{coName.get(c) ?? '…'}</span><span className="tag">Virksomhed</span><button className="btn ghost sm" onClick={() => setSc(curSc.filter((x) => x !== c))}>Fjern</button></li>)}
           </ul>
           <Picker people={ppl.data} onPick={(p) => !curSj.includes(p.id) && setSj([...curSj, p.id])} listId="pp-sj" placeholder="Tilføj omtalt person" />
-          <div className="bar"><input className="grow" list="co-sc" placeholder="Tilføj omtalt virksomhed" value="" onChange={(e) => { const m = cos.data!.find((c) => c.name === e.target.value); if (m && !curSc.includes(m.id)) setSc([...curSc, m.id]); }} /><datalist id="co-sc">{cos.data.map((c) => <option key={c.id} value={c.name} />)}</datalist></div>
+          <CompanyAdd options={cos.data} onPick={(id) => !curSc.includes(id) && setSc([...curSc, id])} />
           {id ? <ActivityFiles aid={id} /> : <p className="mute">Gem aktiviteten først, så kan du vedhæfte filer og fotos.</p>}
           <Err msg={msg} />
           <div className="bar">
@@ -163,4 +163,11 @@ function Followups({ aid, fus, users, onChange }: { aid: string; fus: Fu[]; user
       </div>
     </>
   );
+}
+
+function CompanyAdd({ options, onPick }: { options: { id: string; name: string }[]; onPick: (id: string) => void }) {
+  const [v, setV] = useState('');
+  return (<div className="bar"><input className="grow" list="co-sc" value={v} placeholder="Tilføj omtalt virksomhed" onChange={(e) => {
+    const val = e.target.value; setV(val); const m = options.find((c) => c.name.toLowerCase() === val.trim().toLowerCase()); if (m) { onPick(m.id); setV(''); }
+  }} /><datalist id="co-sc">{options.map((c) => <option key={c.id} value={c.name} />)}</datalist></div>);
 }
