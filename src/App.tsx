@@ -71,18 +71,18 @@ export default function App() {
   }
   return (
     <div className="shell">
-      <nav className="rail" aria-label="Hovedmenu">
-        <div className="mark">PONTIFEX<i>.</i></div>
-        {NAV.map(([v, l, set]) => <Link key={v} view={v} className={'nav' + (set.includes(r.view) ? ' on' : '')}>{l}</Link>)}
+      <header className="top">
+        <div className="brand"><span className="logo"><b>P</b><i>F</i></span><span className="t">PONTIFEX<small>Personligt CRM</small></span></div>
+        <nav className="tabs" aria-label="Hovedmenu">
+          {NAV.map(([v, l, set]) => <Link key={v} view={v} className={'tab' + (set.includes(r.view) ? ' on' : '')}>{l}</Link>)}
+        </nav>
         <span className="sp" />
-        <button className="btn ghost sm" onClick={toggle}>{theme === 'dark' ? 'Lys tilstand' : 'Mørk tilstand'}</button>
-        <button className="btn ghost sm" onClick={() => supabase.auth.signOut()}>Log ud</button>
-      </nav>
+        <button className="tb" onClick={toggle}>{theme === 'dark' ? 'Lys' : 'Mørk'}</button>
+        <button className="tb" onClick={() => supabase.auth.signOut()}>Log ud</button>
+      </header>
       <main className="main">{page}</main>
       <nav className="tabbar" aria-label="Hovedmenu">
         {NAV.map(([v, l, set]) => <Link key={v} view={v} className={set.includes(r.view) ? 'on' : ''}>{l}</Link>)}
-        <a href="#" onClick={(e) => { e.preventDefault(); toggle(); }}>{theme === 'dark' ? 'Lys' : 'Mørk'}</a>
-        <a href="#" onClick={(e) => { e.preventDefault(); supabase.auth.signOut(); }}>Log ud</a>
       </nav>
     </div>
   );
