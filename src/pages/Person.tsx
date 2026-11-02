@@ -4,6 +4,7 @@ import { useAsync } from '../lib/useAsync';
 import { go } from '../lib/nav';
 import { Link, Err, Field, fullName } from '../lib/ui';
 import { useLookups } from '../lib/lookups';
+import MergePerson from './MergePerson';
 import { CompanyPick, findCompany, useCompanyOpts } from '../lib/CompanyPick';
 
 type Contact = { id: string; first_name: string; middle_name: string | null; last_name: string | null; email: string | null; phone: string | null; linkedin_url: string | null };
@@ -121,6 +122,7 @@ export default function Person({ id }: { id: string | null }) {
         <ul className="list">{data.activities.map((a) => <li key={a.id}><span className="mute" style={{ minWidth: 92 }}>{a.occurred_on}</span><span className="grow"><Link view="aktivitet" id={a.id}>{a.title}</Link></span><span className="tag">{a.type?.name}</span></li>)}</ul>}
         {data.mentioned.length > 0 && (<><h2>Omtalt i</h2><ul className="list">{data.mentioned.map((a) => <li key={a.id}><span className="mute" style={{ minWidth: 92 }}>{a.occurred_on}</span><span className="grow"><Link view="aktivitet" id={a.id}>{a.title}</Link></span><span className="tag">{a.type?.name}</span></li>)}</ul></>)}</>)}
       {id && <Affiliations contactId={id} cur={cur} past={past} onChange={reload} />}
+      {id && !edit && <MergePerson id={id} name={fullName(c)} />}
     </>
   );
 }
