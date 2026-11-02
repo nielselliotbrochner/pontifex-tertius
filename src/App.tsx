@@ -10,6 +10,7 @@ import Company from './pages/Company';
 import Cleanup from './pages/Cleanup';
 import Activities from './pages/Activities';
 import Activity from './pages/Activity';
+import Admin from './pages/Admin';
 
 function Login() {
   const [email, setEmail] = useState(''); const [pw, setPw] = useState(''); const [msg, setMsg] = useState<string | null>(null);
@@ -32,7 +33,7 @@ function Login() {
   );
 }
 
-const NAV: [string, string, string[]][] = [['personer', 'Personer', ['personer', 'person', 'person-ny']], ['virksomheder', 'Virksomheder', ['virksomheder', 'virksomhed', 'virksomhed-ny']], ['aktiviteter', 'Aktiviteter', ['aktiviteter', 'aktivitet', 'aktivitet-ny']], ['oprydning', 'Oprydning', ['oprydning']]];
+const NAV: [string, string, string[]][] = [['personer', 'Personer', ['personer', 'person', 'person-ny']], ['virksomheder', 'Virksomheder', ['virksomheder', 'virksomhed', 'virksomhed-ny']], ['aktiviteter', 'Aktiviteter', ['aktiviteter', 'aktivitet', 'aktivitet-ny']], ['oprydning', 'Oprydning', ['oprydning']], ['admin', 'Admin', ['admin']]];
 
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
@@ -64,6 +65,7 @@ export default function App() {
     case 'aktiviteter': page = <Activities />; break;
     case 'aktivitet': page = <Activity key={r.id} id={r.id} />; break;
     case 'aktivitet-ny': page = <Activity key="new" id={null} />; break;
+    case 'admin': page = <Admin />; break;
     case 'oprydning': page = <Cleanup />; break;
     default: page = <Persons />;
   }
