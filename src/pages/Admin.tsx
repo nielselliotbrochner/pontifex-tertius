@@ -10,6 +10,7 @@ const LISTS: { t: string; label: string; hint: string; ranked?: boolean }[] = [
   { t: 'activity_type', label: 'Aktivitetstyper', hint: 'Fx Kaffemøde og Konference.' },
   { t: 'affiliation_type', label: 'Tilknytningstyper', hint: 'Fx medarbejder eller bestyrelse.' },
   { t: 'company_type', label: 'Virksomhedstyper', hint: 'Fx rådgiver, bygherre, fond.' },
+  { t: 'branch', label: 'Brancher', hint: 'Fx Arkitekt, Entreprenør og Ingeniør. En virksomhed kan have flere. Bruges til at filtrere på Virksomheder.' },
   { t: 'sector', label: 'Sektorer', hint: 'Branche eller sektor på virksomheder.' },
   { t: 'acquaintance', label: 'Kendskab', hint: 'Hvor godt du kender personen. Privat for dig.' },
 ];

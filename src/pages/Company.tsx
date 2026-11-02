@@ -96,6 +96,7 @@ export default function Company({ id }: { id: string | null }) {
           <p className="sub">{[lk.data?.company_type.find((o) => o.id === data.co.type_id)?.name, data.co.cvr && 'CVR ' + data.co.cvr].filter(Boolean).join(' · ')}
             {data.co.website && <> · <a href={/^https?:/.test(data.co.website) ? data.co.website : 'https://' + data.co.website} target="_blank" rel="noopener noreferrer">{data.co.website}</a></>}</p>
           <div className="bar"><button className="btn ghost sm" onClick={() => setEdit(true)}>Redigér</button></div>
+          {id && <Branches cid={id} />}
         </>
       )}
       {id && (
@@ -159,6 +160,37 @@ function Owners({ id, owners, nameOf, options, onChange }: { id: string; owners:
         <Field label="Ejerandel i procent"><input inputMode="decimal" value={share} onChange={(e) => setShare(e.target.value)} /></Field>
       </div>
       <div className="bar"><label className="check"><input type="checkbox" checked={main} onChange={(e) => setMain(e.target.checked)} /> Hovedejer</label><button className="btn ghost sm" onClick={add}>Tilføj</button></div>
+    </>
+  );
+}
+
+function Branches({ cid }: { cid: string }) {
+  const { data, reload } = useAsync(async () => {
+    const [b, m] = await Promise.all([
+      supabase.from('branch').select('id,name').eq('active', true).order('sort_order'),
+      supabase.from('company_branch').select('branch_id').eq('company_id', cid),
+    ]);
+    if (b.error) throw b.error; if (m.error) throw m.error;
+    return { all: b.data as { id: string; name: string }[], mine: (m.data as { branch_id: string }[]).map((x) => x.branch_id) };
+  }, [cid]);
+  const [open, setOpen] = useState(false); const [msg, setMsg] = useState<string | null>(null);
+  if (!data) return null;
+  const toggle = async (bid: string) => {
+    setMsg(null);
+    const r = data.mine.includes(bid) ? await supabase.from('company_branch').delete().eq('company_id', cid).eq('branch_id', bid) : await supabase.from('company_branch').insert({ company_id: cid, branch_id: bid });
+    if (r.error) setMsg(r.error.message); reload();
+  };
+  const mine = data.all.filter((b) => data.mine.includes(b.id));
+  return (
+    <>
+      <h2>Brancher</h2>
+      <Err msg={msg} />
+      <div className="bar">
+        {mine.length === 0 && !open && <span className="mute">Ingen brancher valgt.</span>}
+        {!open && mine.map((b) => <span className="tag" key={b.id}>{b.name}</span>)}
+        {open && data.all.map((b) => <label className="check" key={b.id} style={{ display: 'inline-flex', marginRight: 16 }}><input type="checkbox" checked={data.mine.includes(b.id)} onChange={() => toggle(b.id)} />{b.name}</label>)}
+        <button className="btn ghost sm" onClick={() => setOpen(!open)}>{open ? 'Færdig' : 'Redigér brancher'}</button>
+      </div>
     </>
   );
 }
