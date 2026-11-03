@@ -49,7 +49,7 @@ select option { background: var(--paper); color: var(--ink); }
 .btn:disabled { opacity: .45; cursor: default; }
 table { width: 100%; border-collapse: collapse; }
 th { text-align: left; font-weight: 500; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line); }
-td { padding: 9px 12px 9px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+td { padding: var(--py, 9px) 12px var(--py, 9px) 0; line-height: 1.25; border-bottom: 1px solid var(--line); vertical-align: top; }
 tbody tr:hover { background: var(--wash); }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .rank { display: inline-block; min-width: 22px; text-align: center; font: 600 12px var(--mono); }
@@ -69,7 +69,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .empty p { margin: 4px 0 0; }
 .err { border-left: 2px solid var(--red); padding: 8px 12px; background: var(--wash); margin: 12px 0; font-size: 13px; }
 .list { list-style: none; margin: 0; padding: 0; }
-.list li { display: flex; gap: 12px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.list li { display: flex; gap: 12px; align-items: baseline; padding: var(--py, 9px) 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 .list li .grow { flex: 1; min-width: 160px; }
 .mute { color: var(--mute); }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 40px; }
@@ -82,7 +82,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .check input { width: auto; }
 .tree { list-style: none; padding-left: 20px; margin: 0; border-left: 1px solid var(--line); }
 .tree.root { padding-left: 0; border: 0; }
-.tree li { padding: 4px 0; }
+.tree li { padding: var(--pt, 4px) 0; }
 .dates { display: inline-flex; gap: 6px; align-items: center; }
 .dates input { padding: 4px 6px; font-size: 12px; }
 /* Netværk */
@@ -128,9 +128,9 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .chip { background: transparent; border: 1px solid var(--line); padding: 3px 8px; margin: 0 6px 6px 0; font-size: 12px; cursor: pointer; }
 .chip:hover { border-color: var(--ink); }
 /* Tekststørrelse for indhold: Stor (som før), Mellem, Lille. Topbar og bundmenu skaleres ikke. */
-:root { --s: 1; }
-:root[data-size="m"] { --s: .92; }
-:root[data-size="s"] { --s: .85; }
+:root { --s: 1; --py: 9px; --pt: 4px; }
+:root[data-size="m"] { --s: .86; --py: 5px; --pt: 2px; }
+:root[data-size="s"] { --s: .74; --py: 2px; --pt: 1px; }
 .main { font-size: calc(14px * var(--s)); }
 h1 { font-size: calc(22px * var(--s)); }
 h2 { font-size: calc(11px * var(--s)); }
