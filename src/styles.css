@@ -86,13 +86,14 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .dates { display: inline-flex; gap: 6px; align-items: center; }
 .dates input { padding: 4px 6px; font-size: 12px; }
 /* Netværk */
-:root { --k-current: #292425; --k-former: #8B8586; --k-together: #2F7D9B; --k-mentionedPerson: #EF4856; --k-mentionedCompany: #E08A1E; --k-group: #3C8D5A; }
-:root[data-theme="dark"] { --k-current: #F5F0EF; --k-former: #9C9596; --k-together: #5BB3D0; --k-mentionedPerson: #FF6B78; --k-mentionedCompany: #F2A33C; --k-group: #6CC68D; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --k-current: #F5F0EF; --k-former: #9C9596; --k-together: #5BB3D0; --k-mentionedPerson: #FF6B78; --k-mentionedCompany: #F2A33C; --k-group: #6CC68D; } }
+:root { --k-current: #292425; --k-former: #8B8586; --k-together: #2F7D9B; --k-mentionedPerson: #EF4856; --k-mentionedCompany: #E08A1E; --k-group: #3C8D5A; --k-owns: #7A4FB0; }
+:root[data-theme="dark"] { --k-current: #F5F0EF; --k-former: #9C9596; --k-together: #5BB3D0; --k-mentionedPerson: #FF6B78; --k-mentionedCompany: #F2A33C; --k-group: #6CC68D; --k-owns: #B494E0; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --k-current: #F5F0EF; --k-former: #9C9596; --k-together: #5BB3D0; --k-mentionedPerson: #FF6B78; --k-mentionedCompany: #F2A33C; --k-group: #6CC68D; --k-owns: #B494E0; } }
 .ln { fill: none; stroke-linecap: round; }
 .e-current { stroke: var(--k-current); }
 .e-former { stroke: var(--k-former); stroke-dasharray: 6 4; }
 .e-group { stroke: var(--k-group); stroke-dasharray: 10 3 2 3; }
+.e-owns { stroke: var(--k-owns); stroke-dasharray: 2 3; stroke-width: 2.2px; stroke-linecap: round; }
 .e-together { stroke: var(--k-together); }
 .e-mentionedPerson { stroke: var(--k-mentionedPerson); }
 .e-mentionedCompany { stroke: var(--k-mentionedCompany); stroke-dasharray: 1.5 4; stroke-linecap: round; }

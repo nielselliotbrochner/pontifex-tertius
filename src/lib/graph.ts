@@ -1,8 +1,9 @@
-export type Kind = 'current' | 'former' | 'group' | 'together' | 'mentionedPerson' | 'mentionedCompany';
+export type Kind = 'current' | 'former' | 'group' | 'owns' | 'together' | 'mentionedPerson' | 'mentionedCompany';
 export const KINDS: { k: Kind; label: string; hint: string; directed: boolean }[] = [
   { k: 'current', label: 'Samme virksomhed nu', hint: 'Personer med aktiv tilknytning til samme virksomhed', directed: false },
   { k: 'former', label: 'Har arbejdet i samme virksomhed', hint: 'Mindst én af dem har en afsluttet tilknytning til virksomheden', directed: false },
   { k: 'group', label: 'Samme organisation', hint: 'Personer i virksomheder under samme øverste ejer, fx forvaltninger i en kommune eller selskaber i en koncern', directed: false },
+  { k: 'owns', label: 'Ejer/datterselskab (andet CVR)', hint: 'Ejerskab mellem selskaber i samme koncern. Viser hvilket selskab der ejer hvilket, også når de har forskelligt CVR-nummer', directed: false },
   { k: 'together', label: 'Deltog i samme aktivitet', hint: 'Aktiviteter med op til 12 deltagere', directed: false },
   { k: 'mentionedPerson', label: 'Har omtalt person', hint: 'Deltager i en aktivitet, hvor en anden person er omtalt', directed: true },
   { k: 'mentionedCompany', label: 'Har omtalt virksomhed', hint: 'Deltager i en aktivitet, hvor en virksomhed er omtalt', directed: true },
@@ -48,7 +49,7 @@ export function buildGraph(raw: Raw, on: Record<Kind, boolean>, o: Opts): { node
       for (const [pid, k] of kindOf) add(k, 'p:' + pid, 'c:' + cid, false);
     }
   }
-  if (on.group) {
+  if (on.group || on.owns) {
     const up = new Map<string, string>();
     for (const o of raw.own) if (!up.has(o.owned_company_id) || o.is_main) up.set(o.owned_company_id, o.owner_company_id);
     const rootOf = (id: string) => { let c = id; const seen = new Set<string>([c]); while (up.has(c)) { const n = up.get(c)!; if (seen.has(n)) break; seen.add(n); c = n; } return c; };
@@ -61,7 +62,20 @@ export function buildGraph(raw: Raw, on: Record<Kind, boolean>, o: Opts): { node
     }
     for (const [root, rows] of byRoot) {
       if (new Set(rows.map((r) => r.pid)).size < 2 || new Set(rows.map((r) => r.cid)).size < 2) continue;
-      for (const pid of new Set(rows.map((r) => r.pid))) add('group', 'p:' + pid, 'c:' + root, false);
+      if (on.group) for (const pid of new Set(rows.map((r) => r.pid))) add('group', 'p:' + pid, 'c:' + root, false);
+      if (on.owns) {
+        const done = new Set<string>();
+        for (const cid of new Set(rows.map((r) => r.cid))) {
+          let c = cid; const seen = new Set<string>([c]);
+          while (up.has(c)) {
+            const owner = up.get(c)!; if (seen.has(owner)) break; seen.add(owner);
+            const key = owner + '>' + c;
+            if (done.has(key)) break;
+            done.add(key); add('owns', 'c:' + owner, 'c:' + c, true);
+            c = owner;
+          }
+        }
+      }
     }
   }
   const byAct = (xs: { activity_id: string; contact_id: string }[]) => group(xs.filter((x) => person.has(x.contact_id)), (x) => x.activity_id);

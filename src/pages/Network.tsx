@@ -7,8 +7,8 @@ import { Link, Err, fullName } from '../lib/ui';
 import { buildGraph, KINDS, type GEdge, type GNode, type Kind, type Raw } from '../lib/graph';
 
 type Ov = { contact_id: string; first_name: string; middle_name: string | null; last_name: string | null; company_name: string | null; rank: number | null; is_decision_maker: boolean | null };
-const ALL: Record<Kind, boolean> = { current: true, former: true, group: true, together: true, mentionedPerson: true, mentionedCompany: true };
-const NONE: Record<Kind, boolean> = { current: false, former: false, group: false, together: false, mentionedPerson: false, mentionedCompany: false };
+const ALL: Record<Kind, boolean> = { current: true, former: true, group: true, owns: true, together: true, mentionedPerson: true, mentionedCompany: true };
+const NONE: Record<Kind, boolean> = { current: false, former: false, group: false, owns: false, together: false, mentionedPerson: false, mentionedCompany: false };
 const radius = (n: GNode) => (n.type === 'c' ? 8 : n.dm ? 7 : 5);
 const kindIdx = (k: Kind) => KINDS.findIndex((x) => x.k === k);
 
@@ -32,7 +32,7 @@ export default function Network() {
   const [q, setQ] = useState('');
 
   const counts = useMemo(() => {
-    const c: Record<Kind, number> = { current: 0, former: 0, group: 0, together: 0, mentionedPerson: 0, mentionedCompany: 0 };
+    const c: Record<Kind, number> = { current: 0, former: 0, group: 0, owns: 0, together: 0, mentionedPerson: 0, mentionedCompany: 0 };
     if (!raw) return c;
     for (const e of buildGraph(raw, ALL, { dmOnly, isolated: false }).edges) c[e.kind]++;
     return c;
@@ -61,7 +61,7 @@ export default function Network() {
     const nodes = graph.nodes; nodesRef.current = nodes;
     nodes.forEach((n, i) => { const p = pos.current.get(n.id); if (p) { n.x = p.x; n.y = p.y; } else { const a = i * 2.4; n.x = Math.cos(a) * (20 + i * 3); n.y = Math.sin(a) * (20 + i * 3); } });
     const s = forceSimulation<GNode>(nodes)
-      .force('link', forceLink<GNode, GEdge>(graph.edges).id((n) => n.id).distance((e) => (e.kind === 'current' || e.kind === 'former' || e.kind === 'group' ? 46 : 80)).strength(0.5))
+      .force('link', forceLink<GNode, GEdge>(graph.edges).id((n) => n.id).distance((e) => (e.kind === 'current' || e.kind === 'former' || e.kind === 'group' ? 46 : e.kind === 'owns' ? 38 : 80)).strength(0.5))
       .force('charge', forceManyBody().strength(-70))
       .force('center', forceCenter(0, 0).strength(0.05))
       .force('collide', forceCollide<GNode>((n) => radius(n) + 5))
@@ -146,7 +146,7 @@ export default function Network() {
             </li>))}</ul>
           <div className="bar">
             <button className="btn ghost sm" onClick={() => setOn(ALL)}>Alle</button>
-            <button className="btn ghost sm" onClick={() => setOn({ ...NONE, current: true, former: true, group: true })}>Virksomhed</button>
+            <button className="btn ghost sm" onClick={() => setOn({ ...NONE, current: true, former: true, group: true, owns: true })}>Virksomhed</button>
             <button className="btn ghost sm" onClick={() => setOn({ ...NONE, mentionedPerson: true, mentionedCompany: true })}>Omtale</button>
             <button className="btn ghost sm" onClick={() => setOn(NONE)}>Ingen</button>
           </div>
