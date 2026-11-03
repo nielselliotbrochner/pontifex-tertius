@@ -6,6 +6,7 @@ import { Link, Err, Field, fullName } from '../lib/ui';
 import { useLookups } from '../lib/lookups';
 import { CompanyPick, findCompany, useCompanyOpts } from '../lib/CompanyPick';
 
+type NameRow = { id: string; name: string; valid_from: string | null; valid_to: string | null };
 type Co = { id: string; name: string; cvr: string | null; website: string | null; type_id: string | null; sector_id: string | null };
 type Own = { id: string; owner_company_id: string; owned_company_id: string; share_pct: number | null; is_main: boolean };
 type Member = { id: string; title: string | null; start_date: string | null; end_date: string | null; contact: { id: string; first_name: string; middle_name: string | null; last_name: string | null } | null; contact_company_level: { level: { name: string; sort_order: number; is_ranked: boolean } | null }[] };
@@ -25,17 +26,18 @@ export default function Company({ id }: { id: string | null }) {
     const brs = await supabase.from('branch').select('id,name').eq('active', true).order('sort_order');
     if (brs.error) throw brs.error;
     const br = brs.data as { id: string; name: string }[];
-    if (!id) return { co: blank, own: all.data as Own[], members: [] as Member[], acts: [] as CAct[], mentioned: [] as CAct[], br, mine: [] as string[] };
-    const [co, mem, pa, ac, mb] = await Promise.all([
+    if (!id) return { co: blank, own: all.data as Own[], members: [] as Member[], acts: [] as CAct[], mentioned: [] as CAct[], br, mine: [] as string[], names: [] as NameRow[] };
+    const [co, mem, pa, ac, mb, nh] = await Promise.all([
       supabase.from('company').select('id,name,cvr,website,type_id,sector_id').eq('id', id).single(),
       supabase.from('contact_company').select('id,title,start_date,end_date,contact(id,first_name,middle_name,last_name),contact_company_level(level(name,sort_order,is_ranked))').eq('company_id', id).order('end_date', { ascending: false, nullsFirst: true }).order('start_date', { ascending: false, nullsFirst: false }),
       supabase.from('activity_participant').select('activity(id,occurred_on,title,type:activity_type(name))').eq('company_id', id),
       supabase.from('activity_company').select('activity(id,occurred_on,title,type:activity_type(name))').eq('company_id', id),
       supabase.from('company_branch').select('branch_id').eq('company_id', id),
+      supabase.from('company_name_history').select('id,name,valid_from,valid_to').eq('company_id', id).order('valid_to', { ascending: false, nullsFirst: false }),
     ]);
     if (co.error) throw co.error;
     const flat = (d: unknown): CAct[] => { const m = new Map<string, CAct>(); for (const x of (d ?? []) as { activity: CAct | null }[]) if (x.activity) m.set(x.activity.id, x.activity); return [...m.values()].sort((a, b) => b.occurred_on.localeCompare(a.occurred_on)); };
-    return { co: co.data as Co, own: all.data as Own[], members: (mem.data ?? []) as unknown as Member[], acts: flat(pa.data), mentioned: flat(ac.data), br, mine: ((mb.data ?? []) as { branch_id: string }[]).map((x) => x.branch_id) };
+    return { co: co.data as Co, own: all.data as Own[], members: (mem.data ?? []) as unknown as Member[], acts: flat(pa.data), mentioned: flat(ac.data), br, names: (nh.data ?? []) as NameRow[], mine: ((mb.data ?? []) as { branch_id: string }[]).map((x) => x.branch_id) };
   }, [id]);
   const [edit, setEdit] = useState(!id);
   const [f, setF] = useState<Co | null>(null);
@@ -110,6 +112,7 @@ export default function Company({ id }: { id: string | null }) {
             {data.co.website && <> · <a href={/^https?:/.test(data.co.website) ? data.co.website : 'https://' + data.co.website} target="_blank" rel="noopener noreferrer">{data.co.website}</a></>}</p>
           <div className="bar"><button className="btn ghost sm" onClick={() => setEdit(true)}>Redigér</button></div>
           {id && <Branches cid={id} />}
+          {id && <Names cid={id} names={data.names} onChange={reload} />}
         </>
       )}
       {id && (
@@ -204,6 +207,35 @@ function Branches({ cid }: { cid: string }) {
         {open && data.all.map((b) => <label className="check" key={b.id} style={{ display: 'inline-flex', marginRight: 16 }}><input type="checkbox" checked={data.mine.includes(b.id)} onChange={() => toggle(b.id)} />{b.name}</label>)}
         <button className="btn ghost sm" onClick={() => setOpen(!open)}>{open ? 'Færdig' : 'Redigér brancher'}</button>
       </div>
+    </>
+  );
+}
+
+function Names({ cid, names, onChange }: { cid: string; names: NameRow[]; onChange: () => void }) {
+  const [name, setName] = useState(''); const [from, setFrom] = useState(''); const [to, setTo] = useState('');
+  const [msg, setMsg] = useState<string | null>(null);
+  async function add() {
+    if (!name.trim()) return;
+    const x = await supabase.from('company_name_history').insert({ company_id: cid, name: name.trim(), valid_from: from || null, valid_to: to || null });
+    if (x.error) { setMsg(x.error.message); return; }
+    setName(''); setFrom(''); setTo(''); setMsg(null); onChange();
+  }
+  const rm = async (n: NameRow) => { if (confirm('Fjern det tidligere navn?')) { await supabase.from('company_name_history').delete().eq('id', n.id); onChange(); } };
+  return (
+    <>
+      <h2>Tidligere navne</h2>
+      <p className="mute" style={{ marginTop: 0 }}>Navne fra før et navneskift. De kan søges på og vises på personer, der var tilknyttet dengang.</p>
+      {names.length === 0 && <p className="mute">Ingen tidligere navne.</p>}
+      <ul className="list">{names.map((n) => (
+        <li key={n.id}><span className="grow">{n.name}<div className="mute">{[n.valid_from, n.valid_to].some(Boolean) ? (n.valid_from ?? 'ukendt start') + ' til ' + (n.valid_to ?? 'ukendt slut') : 'Periode ukendt'}</div></span>
+          <button className="btn ghost sm" onClick={() => rm(n)}>Fjern</button></li>))}</ul>
+      <Err msg={msg} />
+      <div className="grid" style={{ marginTop: 12 }}>
+        <Field label="Tidligere navn"><input value={name} onChange={(e) => setName(e.target.value)} /></Field>
+        <Field label="Fra"><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
+        <Field label="Til"><input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
+      </div>
+      <div className="bar"><button className="btn ghost sm" disabled={!name.trim()} onClick={add}>Tilføj</button></div>
     </>
   );
 }

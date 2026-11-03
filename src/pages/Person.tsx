@@ -11,9 +11,15 @@ import { CompanyPick, findCompany, useCompanyOpts } from '../lib/CompanyPick';
 type Contact = { id: string; first_name: string; middle_name: string | null; last_name: string | null; email: string | null; phone: string | null; linkedin_url: string | null };
 type Rel = { acquaintance_id: string | null; mobile: string | null; notes: string | null; podcast_relevant: boolean };
 type Act = { id: string; occurred_on: string; title: string; type: { name: string } | null };
-type Aff = { id: string; company_id: string; affiliation_type_id: string; note: string | null; title: string | null; is_primary: boolean; start_date: string | null; end_date: string | null; company: { name: string } | null; affiliation_type: { name: string } | null; contact_company_level: { level_id: string; level: { name: string; sort_order: number; is_ranked: boolean } | null }[] };
+type Aff = { id: string; company_id: string; affiliation_type_id: string; note: string | null; title: string | null; is_primary: boolean; start_date: string | null; end_date: string | null; company: { name: string; company_name_history: { name: string; valid_from: string | null; valid_to: string | null }[] } | null; affiliation_type: { name: string } | null; contact_company_level: { level_id: string; level: { name: string; sort_order: number; is_ranked: boolean } | null }[] };
 
 const blank: Contact = { id: '', first_name: '', middle_name: '', last_name: '', email: '', phone: '', linkedin_url: '' };
+// Navnet virksomheden havde, da tilknytningen sluttede (LinkedIn viser også dengang-navnet).
+const nameThen = (a: Aff) => {
+  const now = a.company?.name ?? ''; if (!a.end_date) return { name: now, now: null as string | null };
+  const h = a.company?.company_name_history?.find((x) => (!x.valid_from || x.valid_from <= a.end_date!) && (!x.valid_to || x.valid_to >= a.end_date!));
+  return h && h.name !== now ? { name: h.name, now } : { name: now, now: null };
+};
 const nz = (s: string | null | undefined) => (s && s.trim() ? s.trim() : null);
 
 export default function Person({ id }: { id: string | null }) {
@@ -23,7 +29,7 @@ export default function Person({ id }: { id: string | null }) {
     const [c, rel, affs, labs, acts, mnt] = await Promise.all([
       supabase.from('contact').select('*').eq('id', id).single(),
       supabase.from('contact_relation').select('acquaintance_id,mobile,notes,podcast_relevant').eq('contact_id', id).maybeSingle(),
-      supabase.from('contact_company').select('id,company_id,affiliation_type_id,note,title,is_primary,start_date,end_date,company(name),affiliation_type(name),contact_company_level(level_id,level(name,sort_order,is_ranked))').eq('contact_id', id).order('end_date', { nullsFirst: true, ascending: false }).order('start_date', { ascending: false, nullsFirst: false }),
+      supabase.from('contact_company').select('id,company_id,affiliation_type_id,note,title,is_primary,start_date,end_date,company(name,company_name_history(name,valid_from,valid_to)),affiliation_type(name),contact_company_level(level_id,level(name,sort_order,is_ranked))').eq('contact_id', id).order('end_date', { nullsFirst: true, ascending: false }).order('start_date', { ascending: false, nullsFirst: false }),
       supabase.from('contact_label').select('label_id').eq('contact_id', id),
       supabase.from('activity_participant').select('activity(id,occurred_on,title,type:activity_type(name))').eq('contact_id', id),
       supabase.from('activity_subject').select('activity(id,occurred_on,title,type:activity_type(name))').eq('contact_id', id),
@@ -165,7 +171,7 @@ function Affiliations({ contactId, cur, past, onChange }: { contactId: string; c
     <li key={a.id} style={{ display: 'block' }}><EditAff a={a} contactId={contactId} onDone={() => { setEditId(null); onChange(); }} onCancel={() => setEditId(null)} /></li>
   ) : (
     <li key={a.id}>
-      <span className="grow"><Link view="virksomhed" id={a.company_id}>{a.company?.name}</Link>{a.is_primary && active && <span className="tag" style={{ marginLeft: 8 }}>Primær</span>}{active && a.contact_company_level.some((l) => l.level?.is_ranked && l.level.sort_order <= 3) && <span className="dm" style={{ marginLeft: 8 }} title="Beslutningstager">B</span>}
+      <span className="grow"><Link view="virksomhed" id={a.company_id}>{nameThen(a).name}</Link>{nameThen(a).now && <span className="mute"> (nu {nameThen(a).now})</span>}{a.is_primary && active && <span className="tag" style={{ marginLeft: 8 }}>Primær</span>}{active && a.contact_company_level.some((l) => l.level?.is_ranked && l.level.sort_order <= 3) && <span className="dm" style={{ marginLeft: 8 }} title="Beslutningstager">B</span>}
         <div className="mute">{[a.title, a.affiliation_type?.name].filter(Boolean).join(' · ')}</div></span>
       <span>{a.contact_company_level.map((l) => l.level && <span className="tag" key={l.level.name}>{l.level.name}</span>)}</span>
       <span className="dates">

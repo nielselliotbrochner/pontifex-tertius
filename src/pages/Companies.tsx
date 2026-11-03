@@ -8,14 +8,16 @@ type Row = { company_id: string; name: string; cvr: string | null; company_type:
 
 export default function Companies() {
   const { data: all, error, loading } = useAsync(async () => {
-    const [r, br, cb] = await Promise.all([
+    const [r, br, cb, nh] = await Promise.all([
       supabase.from('v_company_overview').select('company_id,name,cvr,company_type,hq_city,parent_name,parent_company_id,owned_count,current_contacts').eq('active', true).order('name').limit(5000),
       supabase.from('branch').select('id,name,sort_order').eq('active', true).order('sort_order'),
       fetchAll<{ company_id: string; branch_id: string }>((f, t) => supabase.from('company_branch').select('company_id,branch_id').order('company_id').order('branch_id').range(f, t)),
+      fetchAll<{ company_id: string; name: string }>((f, t) => supabase.from('company_name_history').select('company_id,name').order('company_id').order('name').range(f, t)),
     ]);
     if (r.error) throw r.error; if (br.error) throw br.error;
     const by = new Map<string, Set<string>>(); for (const x of cb) (by.get(x.company_id) ?? by.set(x.company_id, new Set()).get(x.company_id)!).add(x.branch_id);
-    return { rows: r.data as Row[], branches: br.data as { id: string; name: string }[], by };
+    const old = new Map<string, string[]>(); for (const x of nh) (old.get(x.company_id) ?? old.set(x.company_id, []).get(x.company_id)!).push(x.name);
+    return { old, rows: r.data as Row[], branches: br.data as { id: string; name: string }[], by };
   }, [], 'companies');
   const data = all?.rows;
   const [q, setQ] = useState('');
@@ -25,7 +27,7 @@ export default function Companies() {
   const rows = useMemo(() => {
     const s = q.trim().toLowerCase();
     return (data ?? []).filter((r) => {
-      if (s && ![r.name, r.cvr, r.hq_city, r.parent_name].some((x) => x?.toLowerCase().includes(s))) return false;
+      if (s && ![r.name, r.cvr, r.hq_city, r.parent_name, ...(all?.old.get(r.company_id) ?? [])].some((x) => x?.toLowerCase().includes(s))) return false;
       if (!sel.length) return true;
       const mine = all?.by.get(r.company_id); if (!mine) return false;
       return every ? sel.every((b) => mine.has(b)) : sel.some((b) => mine.has(b));
@@ -57,7 +59,7 @@ export default function Companies() {
           <tbody>
             {rows.map((r) => (
               <tr key={r.company_id}>
-                <td><Link view="virksomhed" id={r.company_id}>{r.name}</Link>{r.hq_city && <div className="mute">{r.hq_city}</div>}</td>
+                <td><Link view="virksomhed" id={r.company_id}>{r.name}</Link>{(all?.old.get(r.company_id) ?? []).length > 0 && <div className="mute">tidl. {all!.old.get(r.company_id)!.join(', ')}</div>}{r.hq_city && <div className="mute">{r.hq_city}</div>}</td>
                 <td className="hide-s">{r.company_type}</td>
                 <td className="hide-s">{[...(all?.by.get(r.company_id) ?? [])].map((b) => <span className="tag" key={b}>{nameOfBranch(b)}</span>)}</td>
                 <td>{r.parent_company_id ? <Link view="virksomhed" id={r.parent_company_id}>{r.parent_name}</Link> : <span className="mute">Ingen</span>}</td>
