@@ -165,7 +165,7 @@ function Affiliations({ contactId, cur, past, onChange }: { contactId: string; c
     <li key={a.id} style={{ display: 'block' }}><EditAff a={a} contactId={contactId} onDone={() => { setEditId(null); onChange(); }} onCancel={() => setEditId(null)} /></li>
   ) : (
     <li key={a.id}>
-      <span className="grow"><Link view="virksomhed" id={a.company_id}>{a.company?.name}</Link>{a.is_primary && active && <span className="tag" style={{ marginLeft: 8 }}>Primær</span>}
+      <span className="grow"><Link view="virksomhed" id={a.company_id}>{a.company?.name}</Link>{a.is_primary && active && <span className="tag" style={{ marginLeft: 8 }}>Primær</span>}{active && a.contact_company_level.some((l) => l.level?.is_ranked && l.level.sort_order <= 3) && <span className="dm" style={{ marginLeft: 8 }} title="Beslutningstager">B</span>}
         <div className="mute">{[a.title, a.affiliation_type?.name].filter(Boolean).join(' · ')}</div></span>
       <span>{a.contact_company_level.map((l) => l.level && <span className="tag" key={l.level.name}>{l.level.name}</span>)}</span>
       <span className="dates">
