@@ -8,16 +8,17 @@ import { CompanyPick, findCompany, useCompanyOpts } from '../lib/CompanyPick';
 type Cat = 'arkitekt' | 'entreprenor';
 const CATS: { k: Cat; label: string; branch: string }[] = [{ k: 'arkitekt', label: 'Arkitekt', branch: 'architect' }, { k: 'entreprenor', label: 'Entreprenør', branch: 'contractor' }];
 type Crit = { id: string; key: string; category: Cat; grp: string; name: string; sort_order: number };
-type Val = 0 | 1 | 2 | null;
+type Val = 0 | 1 | 2 | 3 | 4 | 5 | null;
+const SCALE: Val[] = [0, 1, 2, 3, 4, 5];
 const GRP: Record<string, string> = { segment: 'Segment', udbudsform: 'Udbudsform', byggesum: 'Byggesum' };
 const SYM = (v: Val | undefined) => (v === undefined ? '' : v === null ? '?' : String(v));
-const NEXT = (v: Val | undefined): Val | undefined => (v === undefined ? 2 : v === 2 ? 1 : v === 1 ? 0 : v === 0 ? null : undefined);
-const LABEL = (v: Val | undefined) => (v === undefined ? 'Ikke vurderet' : v === null ? 'Vurderet uden svar' : v === 2 ? 'Ja' : v === 1 ? 'Delvis' : 'Nej');
+const LABEL = (v: Val | undefined) => (v === undefined ? 'Ikke vurderet' : v === null ? 'Vurderet uden svar' : 'Rating ' + v + ' af 5');
 
 export default function Rating() {
   const [cat, setCat] = useState<Cat>('arkitekt');
   const [q, setQ] = useState('');
-  const [need, setNeed] = useState<string[]>([]); const [min, setMin] = useState<1 | 2>(1);
+  const [need, setNeed] = useState<string[]>([]); const [min, setMin] = useState(3);
+  const [open, setOpen] = useState<string | null>(null);
   const [grpOff, setGrpOff] = useState<string[]>([]);
   const [extra, setExtra] = useState<string[]>([]); const [add, setAdd] = useState('');
   const [sort, setSort] = useState<'name' | 'score'>('name');
@@ -65,8 +66,8 @@ export default function Rating() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, data, q, need, min, sort, local, grpOff]);
 
-  async function cycle(company: string, k: string) {
-    const nv = NEXT(get(company, k)); const key = company + '|' + k;
+  async function setVal(company: string, k: string, nv: Val | undefined) {
+    const key = company + '|' + k; setOpen(null);
     setLocal((x) => ({ ...x, [key]: nv })); setErr(null);
     const r = nv === undefined
       ? await supabase.from('company_rating').delete().eq('company_id', company).eq('criterion_id', k)
@@ -79,12 +80,12 @@ export default function Rating() {
     setErr(null); setExtra((x) => (x.includes(c.id) ? x : [...x, c.id])); setAdd('');
   }
   const toggle = (arr: string[], set: (v: string[]) => void, k: string) => set(arr.includes(k) ? arr.filter((x) => x !== k) : [...arr, k]);
-  const yes = (k: string) => rows.filter((r) => get(r.id, k) === 2).length;
+  const strong = (k: string) => rows.filter((r) => { const v = get(r.id, k); return typeof v === 'number' && v >= 4; }).length;
 
   return (
     <>
       <h1>Rating</h1>
-      <p className="sub">Vurdér arkitekter og entreprenører på segment, udbudsform og byggesum. Klik i en celle for at skifte: Ja (2), Delvis (1), Nej (0), ? (vurderet uden svar), tom (ikke vurderet).</p>
+      <p className="sub">Vurdér arkitekter og entreprenører på segment, udbudsform og byggesum. Klik i en celle og vælg en rating fra 0 (kan ikke) til 5 (stærkest). ? betyder vurderet uden svar, tom betyder ikke vurderet.</p>
       <div className="bar" role="group" aria-label="Kategori">
         {CATS.map((c) => <button key={c.k} className={'btn sm ' + (cat === c.k ? '' : 'ghost')} aria-pressed={cat === c.k} onClick={() => { setCat(c.k); setNeed([]); setGrpOff([]); }}>{c.label}</button>)}
         <input className="grow" type="search" placeholder="Søg virksomhed" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Søg" />
@@ -104,12 +105,12 @@ export default function Rating() {
         <span className="mono mute">Skal kunne</span>
         <span className="mute">{need.length ? need.map((k) => view?.crit.find((c) => c.id === k)?.name).join(', ') : 'Klik på en kolonneoverskrift for at filtrere'}</span>
         {need.length > 0 && <>
-          <select value={min} onChange={(e) => setMin(Number(e.target.value) as 1 | 2)} aria-label="Mindst"><option value={1}>Mindst delvis</option><option value={2}>Kun ja</option></select>
+          <select value={min} onChange={(e) => setMin(Number(e.target.value))} aria-label="Mindst rating">{[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>Mindst {n}</option>)}</select>
           <button className="btn ghost sm" onClick={() => setNeed([])}>Nulstil</button>
         </>}
       </div>
       <ul className="hmlegend" aria-label="Forklaring">
-        <li><i className="hm hm2">2</i> Ja</li><li><i className="hm hm1">1</i> Delvis</li><li><i className="hm hm0">0</i> Nej</li><li><i className="hm hmq">?</i> Uden svar</li><li><i className="hm hmn" /> Ikke vurderet</li>
+        {SCALE.map((n) => <li key={n}><i className={'hm hm' + n}>{n}</i>{n === 0 ? 'Kan ikke' : n === 5 ? 'Stærkest' : ''}</li>)}<li><i className="hm hmq">?</i> Uden svar</li><li><i className="hm hmn" /> Ikke vurderet</li>
       </ul>
       <Err msg={error ?? err} />
       {!loading && view && rows.length === 0 && !error && <Empty title="Ingen virksomheder" text="Sæt branchen Arkitekt eller Entreprenør på virksomhederne, eller tilføj en virksomhed ovenfor." />}
@@ -131,14 +132,22 @@ export default function Rating() {
                 <tr key={r.id}>
                   <td className="hmname"><Link view="virksomhed" id={r.id}>{r.name}</Link></td>
                   {cols.map((c) => { const v = get(r.id, c.id); return (
-                    <td key={c.id} className="hmc"><button className={'hm ' + (v === undefined ? 'hmn' : v === null ? 'hmq' : 'hm' + v)} onClick={() => cycle(r.id, c.id)} title={c.name + ': ' + LABEL(v)} aria-label={r.name + ', ' + c.name + ': ' + LABEL(v)}>{SYM(v)}</button></td>
+                    <td key={c.id} className="hmc"><button className={'hm ' + (v === undefined ? 'hmn' : v === null ? 'hmq' : 'hm' + v)} onClick={() => setOpen(open === r.id + '|' + c.id ? null : r.id + '|' + c.id)} aria-expanded={open === r.id + '|' + c.id} title={c.name + ': ' + LABEL(v)} aria-label={r.name + ', ' + c.name + ': ' + LABEL(v)}>{SYM(v)}</button>
+                      {open === r.id + '|' + c.id && (
+                        <div className="hmpick" role="group" aria-label="Vælg rating">
+                          {SCALE.map((n) => <button key={n} className={'hm hm' + n} onClick={() => setVal(r.id, c.id, n)}>{n}</button>)}
+                          <button className="hm hmq" onClick={() => setVal(r.id, c.id, null)} title="Vurderet uden svar">?</button>
+                          <button className="hm hmn" onClick={() => setVal(r.id, c.id, undefined)} title="Fjern vurdering">×</button>
+                        </div>
+                      )}
+                    </td>
                   ); })}
-                  <td className="num hmscore">{r.score}<span className="mute">/{cols.length * 2}</span></td>
+                  <td className="num hmscore">{r.score}<span className="mute">/{cols.length * 5}</span></td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
-              <tr><td className="hmname mute">Antal ja</td>{cols.map((c) => <td key={c.id} className="hmc mute">{yes(c.id)}</td>)}<td /></tr>
+              <tr><td className="hmname mute">Antal 4-5</td>{cols.map((c) => <td key={c.id} className="hmc mute">{strong(c.id)}</td>)}<td /></tr>
             </tfoot>
           </table>
         </div>
