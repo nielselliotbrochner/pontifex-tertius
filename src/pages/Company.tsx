@@ -8,7 +8,7 @@ import { CompanyPick, findCompany, useCompanyOpts } from '../lib/CompanyPick';
 
 type Co = { id: string; name: string; cvr: string | null; website: string | null; type_id: string | null; sector_id: string | null };
 type Own = { id: string; owner_company_id: string; owned_company_id: string; share_pct: number | null; is_main: boolean };
-type Member = { id: string; title: string | null; start_date: string | null; end_date: string | null; contact: { id: string; first_name: string; middle_name: string | null; last_name: string | null } | null; contact_company_level: { level: { name: string } | null }[] };
+type Member = { id: string; title: string | null; start_date: string | null; end_date: string | null; contact: { id: string; first_name: string; middle_name: string | null; last_name: string | null } | null; contact_company_level: { level: { name: string; sort_order: number; is_ranked: boolean } | null }[] };
 const nz = (s: string | null | undefined) => (s && s.trim() ? s.trim() : null);
 const blank: Co = { id: '', name: '', cvr: '', website: '', type_id: null, sector_id: null };
 
@@ -28,7 +28,7 @@ export default function Company({ id }: { id: string | null }) {
     if (!id) return { co: blank, own: all.data as Own[], members: [] as Member[], acts: [] as CAct[], mentioned: [] as CAct[], br, mine: [] as string[] };
     const [co, mem, pa, ac, mb] = await Promise.all([
       supabase.from('company').select('id,name,cvr,website,type_id,sector_id').eq('id', id).single(),
-      supabase.from('contact_company').select('id,title,start_date,end_date,contact(id,first_name,middle_name,last_name),contact_company_level(level(name))').eq('company_id', id).order('end_date', { ascending: false, nullsFirst: true }).order('start_date', { ascending: false, nullsFirst: false }),
+      supabase.from('contact_company').select('id,title,start_date,end_date,contact(id,first_name,middle_name,last_name),contact_company_level(level(name,sort_order,is_ranked))').eq('company_id', id).order('end_date', { ascending: false, nullsFirst: true }).order('start_date', { ascending: false, nullsFirst: false }),
       supabase.from('activity_participant').select('activity(id,occurred_on,title,type:activity_type(name))').eq('company_id', id),
       supabase.from('activity_company').select('activity(id,occurred_on,title,type:activity_type(name))').eq('company_id', id),
       supabase.from('company_branch').select('branch_id').eq('company_id', id),
@@ -128,7 +128,7 @@ export default function Company({ id }: { id: string | null }) {
           <h2>Personer</h2>
           {(() => {
             const row = (m: Member) => m.contact && (
-              <li key={m.id}><span className="grow"><Link view="person" id={m.contact.id}>{fullName(m.contact)}</Link><div className="mute">{m.title}</div></span>
+              <li key={m.id}><span className="grow"><Link view="person" id={m.contact.id}>{fullName(m.contact)}</Link>{!m.end_date && m.contact_company_level.some((l) => l.level?.is_ranked && l.level.sort_order <= 3) && <span className="dm" style={{ marginLeft: 8 }} title="Beslutningstager">B</span>}<div className="mute">{m.title}</div></span>
                 <span>{m.contact_company_level.map((l) => l.level && <span className="tag" key={l.level.name}>{l.level.name}</span>)}</span>
                 <span className="mute" style={{ minWidth: 92, textAlign: 'right' }}>{period(m)}</span></li>);
             const act = data.members.filter((m) => !m.end_date); const old = data.members.filter((m) => m.end_date);
