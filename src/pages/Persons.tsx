@@ -77,7 +77,7 @@ export default function Persons() {
               <tr key={r.contact_id}>
                 <td className="num"><span className="rank">{r.rank ?? ''}</span></td>
                 <td><Link view="person" id={r.contact_id}>{[r.first_name, r.middle_name].filter(Boolean).join(' ')}</Link></td>
-                <td><Link view="person" id={r.contact_id}>{r.last_name}</Link>{r.is_decision_maker && <div><span className="dm">Beslutningstager</span></div>}</td>
+                <td><Link view="person" id={r.contact_id}>{r.last_name}</Link>{r.is_decision_maker && <> <span className="dm" title="Beslutningstager">B</span></>}</td>
                 <td>{r.company_name ?? <span className="mute">Ingen tilknytning</span>}<div className="mute show-s">{r.title}</div>{r.labels && <div className="hide-s">{r.labels.split(', ').map((l) => <span className="tag" key={l}>{l}</span>)}</div>}</td>
                 <td className="hide-s">{r.title}{r.start_date && <div className="mute">siden {r.start_date.slice(0, 4)}</div>}</td>
                 <td className="hide-s">{r.city}</td>
