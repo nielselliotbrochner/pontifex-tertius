@@ -175,7 +175,7 @@ export default function Network() {
                 <g className="nodes">{graph.nodes.map((n) => (
                   <g key={n.id} data-node={n.id} transform={`translate(${n.x ?? 0},${n.y ?? 0})`} className={'node' + (dim(n.id) ? ' faded' : '') + (n.id === sel ? ' sel' : '')} onPointerEnter={() => setHover(n.id)} onPointerLeave={() => setHover(null)}>
                     {n.type === 'c' ? <rect x={-7} y={-7} width={14} height={14} className="nc" /> : <circle r={radius(n)} className={'np' + (n.dm ? ' dmr' : '')} />}
-                    {showLabel(n) && <text x={radius(n) + 4} y={3.5} className="nl" style={{ fontSize: 10 / Math.sqrt(t.k) }}>{n.label}</text>}
+                    {showLabel(n) && <text x={radius(n) + 4} y={3.5} className="nl" style={{ fontSize: 10 / Math.sqrt(t.k) }}>{n.label}{n.dm ? '  B' : ''}</text>}
                   </g>))}</g>
               </g>
             </svg>
@@ -193,7 +193,7 @@ export default function Network() {
 function Detail({ sel, graph, byId, onSelect }: { sel: GNode | null; graph: { nodes: GNode[]; edges: GEdge[] }; byId: Map<string, GNode>; onSelect: (id: string) => void }) {
   if (!sel) return <p className="mute">Vælg en person eller virksomhed i netværket for at se, hvordan vedkommende hænger sammen med de andre.</p>;
   const mine = graph.edges.filter((e) => e.a === sel.id || e.b === sel.id);
-  const item = (id: string, extra?: string) => { const n = byId.get(id); return n ? <button key={id} className="chip" onClick={() => onSelect(id)}>{n.label}{extra ? <span className="mute"> {extra}</span> : null}</button> : null; };
+  const item = (id: string, extra?: string) => { const n = byId.get(id); return n ? <button key={id} className="chip" onClick={() => onSelect(id)}>{n.label}{n.dm && <span className="dm" style={{ marginLeft: 6 }} title="Beslutningstager">B</span>}{extra ? <span className="mute"> {extra}</span> : null}</button> : null; };
   const rows: { title: string; k: Kind; ids: { id: string; x?: string }[] }[] = [];
   for (const kd of KINDS) {
     const es = mine.filter((e) => e.kind === kd.k);
@@ -224,7 +224,7 @@ function Detail({ sel, graph, byId, onSelect }: { sel: GNode | null; graph: { no
   return (
     <div className="netdetail">
       <h2>{sel.type === 'p' ? 'Person' : 'Virksomhed'}</h2>
-      <div className="bar"><b>{sel.label}</b>{sel.dm && <span className="dm">Beslutningstager</span>}{sel.sub && <span className="mute">{sel.sub}</span>}
+      <div className="bar"><b>{sel.label}</b>{sel.dm && <span className="dm" title="Beslutningstager">B</span>}{sel.sub && <span className="mute">{sel.sub}</span>}
         <span className="grow" /><Link view={sel.type === 'p' ? 'person' : 'virksomhed'} id={sel.ref} className="btn ghost sm">Åbn</Link></div>
       {rows.length === 0 && <p className="mute">Ingen forbindelser med de valgte relationer.</p>}
       {rows.map((r, i) => (
