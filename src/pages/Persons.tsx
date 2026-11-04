@@ -58,6 +58,11 @@ export default function Persons() {
       <div className="kpis">
         <div><b>{total}</b><span>personer</span></div>
         <div><b>{dms}</b><span>beslutningstagere</span></div>
+        <div className="tri">
+          {[1, 2, 3].map((n) => (
+            <p key={n}><b>{(data ?? []).filter((r) => r.is_decision_maker && r.rank === n).length}</b><span>Niveau {n}{lk.data?.level?.[n - 1] ? ' ' + lk.data.level[n - 1].name : ''}</span></p>
+          ))}
+        </div>
         <div><b>{(data ?? []).filter((r) => r.podcast).length}</b><span>relevante for podcast</span></div>
       </div>
       <div className="bar">

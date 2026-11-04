@@ -58,6 +58,10 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .kpis { display: flex; margin: 20px 0 4px; flex-wrap: wrap; border: 1px solid var(--line); width: fit-content; max-width: 100%; }
 .kpis > div { padding: 10px 24px 10px 14px; border-right: 1px solid var(--line); min-width: 120px; }
 .kpis > div:last-child { border-right: 0; }
+.kpis .tri { min-width: 170px; }
+.kpis .tri p { margin: 0; display: flex; align-items: baseline; gap: 10px; line-height: 1.5; }
+.kpis .tri b { display: inline; font-size: 15px; min-width: 28px; text-align: right; }
+.kpis .tri span { font-size: 9px; }
 .kpis b { display: block; font: 500 24px/1.1 var(--mono); letter-spacing: -.02em; }
 .kpis span { color: var(--mute); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px 20px; }
