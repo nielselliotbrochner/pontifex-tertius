@@ -20,7 +20,7 @@ export type Raw = {
 };
 export type GNode = { id: string; type: 'p' | 'c'; ref: string; label: string; sub: string | null; dm: boolean; x?: number; y?: number; vx?: number; vy?: number; fx?: number | null; fy?: number | null };
 export type GEdge = { id: string; kind: Kind; a: string; b: string; w: number; source: string | GNode; target: string | GNode };
-export type Opts = { dmOnly: boolean; isolated: boolean };
+export type Opts = { dmOnly: boolean; isolated: boolean; single?: boolean };
 
 const group = <T,>(xs: T[], key: (x: T) => string) => { const m = new Map<string, T[]>(); for (const x of xs) { const k = key(x); const l = m.get(k); if (l) l.push(x); else m.set(k, [x]); } return m; };
 
@@ -45,7 +45,7 @@ export function buildGraph(raw: Raw, on: Record<Kind, boolean>, o: Opts): { node
         if (!on[k]) continue;
         if (kindOf.get(r.contact_id) !== 'current') kindOf.set(r.contact_id, k);
       }
-      if (kindOf.size < 2) continue;
+      if (kindOf.size < (o.single ? 1 : 2)) continue;
       for (const [pid, k] of kindOf) add(k, 'p:' + pid, 'c:' + cid, false);
     }
   }
@@ -61,7 +61,7 @@ export function buildGraph(raw: Raw, on: Record<Kind, boolean>, o: Opts): { node
       if (l) l.push(row); else byRoot.set(r, [row]);
     }
     for (const [root, rows] of byRoot) {
-      if (new Set(rows.map((r) => r.pid)).size < 2 || new Set(rows.map((r) => r.cid)).size < 2) continue;
+      if (!o.single && (new Set(rows.map((r) => r.pid)).size < 2 || new Set(rows.map((r) => r.cid)).size < 2)) continue;
       if (on.group) for (const pid of new Set(rows.map((r) => r.pid))) add('group', 'p:' + pid, 'c:' + root, false);
       if (on.owns) {
         const done = new Set<string>();

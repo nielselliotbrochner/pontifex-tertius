@@ -27,17 +27,17 @@ export default function Network() {
   }, [], 'network');
 
   const [on, setOn] = useState<Record<Kind, boolean>>(ALL);
-  const [dmOnly, setDmOnly] = useState(false); const [isolated, setIsolated] = useState(false);
+  const [dmOnly, setDmOnly] = useState(false); const [isolated, setIsolated] = useState(false); const [single, setSingle] = useState(false);
   const [sel, setSel] = useState<string | null>(null); const [hover, setHover] = useState<string | null>(null);
   const [q, setQ] = useState('');
 
   const counts = useMemo(() => {
     const c: Record<Kind, number> = { current: 0, former: 0, group: 0, owns: 0, together: 0, mentionedPerson: 0, mentionedCompany: 0 };
     if (!raw) return c;
-    for (const e of buildGraph(raw, ALL, { dmOnly, isolated: false }).edges) c[e.kind]++;
+    for (const e of buildGraph(raw, ALL, { dmOnly, isolated: false, single }).edges) c[e.kind]++;
     return c;
-  }, [raw, dmOnly]);
-  const graph = useMemo(() => (raw ? buildGraph(raw, on, { dmOnly, isolated }) : { nodes: [] as GNode[], edges: [] as GEdge[] }), [raw, on, dmOnly, isolated]);
+  }, [raw, dmOnly, single]);
+  const graph = useMemo(() => (raw ? buildGraph(raw, on, { dmOnly, isolated, single }) : { nodes: [] as GNode[], edges: [] as GEdge[] }), [raw, on, dmOnly, isolated, single]);
 
   // størrelse og visning
   const wrap = useRef<HTMLDivElement>(null); const svg = useRef<SVGSVGElement>(null);
@@ -153,6 +153,7 @@ export default function Network() {
           <h2>Filter</h2>
           <label className="check"><input type="checkbox" checked={dmOnly} onChange={(e) => setDmOnly(e.target.checked)} /> Kun beslutningstagere</label>
           <label className="check" style={{ marginTop: 8 }}><input type="checkbox" checked={isolated} onChange={(e) => setIsolated(e.target.checked)} /> Vis personer uden relationer</label>
+          <label className="check" style={{ marginTop: 8 }} title="Tegner linjen til virksomheden og ejerkæden, også når kun én person er tilknyttet"><input type="checkbox" checked={single} onChange={(e) => setSingle(e.target.checked)} /> Vis virksomheder med kun én person</label>
           <div className="bar"><input className="grow" list="net-people" value={q} placeholder="Find person" onChange={(e) => pickPerson(e.target.value)} />
             <datalist id="net-people">{raw?.persons.map((p) => <option key={p.id} value={p.company ? `${p.name} · ${p.company}` : p.name} />)}</datalist></div>
           <h2>Tegn</h2>
