@@ -60,8 +60,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .kpis > div:last-child { border-right: 0; }
 .kpis .tri { min-width: 170px; }
 .kpis .tri p { margin: 0; display: flex; align-items: baseline; gap: 10px; line-height: 1.5; }
-.kpis .tri b { display: inline; font-size: 15px; min-width: 28px; text-align: right; }
-.kpis .tri span { font-size: 9px; }
+.kpis .tri b, .kpis .tri span { font-size: calc(9px * var(--s)); line-height: 1.5; letter-spacing: .08em; }
+.kpis .tri b { display: inline; font-weight: 500; min-width: 22px; text-align: right; color: var(--ink, inherit); }
 .kpis b { display: block; font: 500 24px/1.1 var(--mono); letter-spacing: -.02em; }
 .kpis span { color: var(--mute); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px 20px; }
