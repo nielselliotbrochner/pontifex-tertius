@@ -127,7 +127,7 @@ export default function Person({ id }: { id: string | null }) {
           </div>
         </>
       )}
-      {id && !edit && (<><h2>Aktiviteter</h2>{data.activities.length === 0 ? <p className="mute">Ingen aktiviteter.</p> :
+      {id && !edit && (<><h2>Aktiviteter</h2><div className="bar"><Link view="aktivitet-ny" id={id} className="btn ghost sm">Ny aktivitet med {c.first_name}</Link></div>{data.activities.length === 0 ? <p className="mute">Ingen aktiviteter.</p> :
         <ul className="list">{data.activities.map((a) => <li key={a.id}><span className="mute" style={{ minWidth: 92 }}>{a.occurred_on}</span><span className="grow"><Link view="aktivitet" id={a.id}>{a.title}</Link></span><span className="tag">{a.type?.name}</span></li>)}</ul>}
         {data.mentioned.length > 0 && (<><h2>Omtalt i</h2><ul className="list">{data.mentioned.map((a) => <li key={a.id}><span className="mute" style={{ minWidth: 92 }}>{a.occurred_on}</span><span className="grow"><Link view="aktivitet" id={a.id}>{a.title}</Link></span><span className="tag">{a.type?.name}</span></li>)}</ul></>)}</>)}
       {id && <Affiliations contactId={id} cur={cur} past={past} onChange={reload} />}

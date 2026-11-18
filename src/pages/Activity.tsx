@@ -14,7 +14,7 @@ type A = { id: string; type_id: string; occurred_on: string; title: string; body
 const today = () => new Date().toISOString().slice(0, 10);
 const nz = (s: string | null | undefined) => (s && s.trim() ? s.trim() : null);
 
-export default function Activity({ id }: { id: string | null }) {
+export default function Activity({ id, withPerson }: { id: string | null; withPerson?: string | null }) {
   const lk = useLookups(); const ppl = usePeople(); const cos = useCompanyOpts();
   const { data, error, loading, reload } = useAsync(async () => {
     if (!id) return { a: null as A | null, parts: [] as Part[], fus: [] as Fu[], subj: [] as string[], subc: [] as string[], users: [] as { user_id: string; display_name: string | null }[] };
@@ -37,8 +37,11 @@ export default function Activity({ id }: { id: string | null }) {
   const [msg, setMsg] = useState<string | null>(null);
   if (error) return <Err msg={error} />;
   if (loading || !data || !lk.data || !ppl.data || !cos.data) return <p className="mute">Henter</p>;
+  const byId0 = new Map(ppl.data.map((p) => [p.id, p]));
   const blank: A = { id: '', type_id: lk.data.activity_type.find((t) => t.name === 'Kaffemøde')?.id ?? lk.data.activity_type[0]?.id ?? '', occurred_on: today(), title: '', body: '', location: '', owner_present: true, visibility: 'shared' };
-  const a = f ?? data.a ?? blank; const cur = parts ?? data.parts;
+  const a = f ?? data.a ?? blank;
+  const dflt: Part[] = !id && withPerson && byId0.has(withPerson) ? [{ contact_id: withPerson, company_id: byId0.get(withPerson)?.company_id ?? null }] : [];
+  const cur = parts ?? (id ? data.parts : dflt);
   const set = <K extends keyof A>(k: K, v: A[K]) => setF({ ...a, [k]: v });
   const byId = new Map(ppl.data.map((p) => [p.id, p]));
   const typeName = lk.data.activity_type.find((t) => t.id === a.type_id)?.name;
@@ -109,7 +112,7 @@ export default function Activity({ id }: { id: string | null }) {
           <div className="bar">
             <button className="btn" disabled={!a.title.trim() || !a.type_id} onClick={save}>Gem</button>
             {!a.title.trim() && <span className="mute">Titel mangler</span>}{!a.type_id && <span className="mute">Vælg en type</span>}
-            <button className="btn ghost" onClick={() => (id ? (setEdit(false), setF(null), setParts(null), setSj(null), setSc(null)) : go('aktiviteter'))}>Annuller</button>
+            <button className="btn ghost" onClick={() => (id ? (setEdit(false), setF(null), setParts(null), setSj(null), setSc(null)) : withPerson ? go('person', withPerson) : go('aktiviteter'))}>Annuller</button>
             <span className="grow" />{id && <button className="btn ghost" onClick={del}>Slet</button>}
           </div>
         </>

@@ -67,7 +67,7 @@ export default function App() {
     case 'virksomhed-ny': page = <Company key="new" id={null} />; break;
     case 'aktiviteter': page = <Activities />; break;
     case 'aktivitet': page = <Activity key={r.id} id={r.id} />; break;
-    case 'aktivitet-ny': page = <Activity key="new" id={null} />; break;
+    case 'aktivitet-ny': page = <Activity key={'new' + (r.id ?? '')} id={null} withPerson={r.id} />; break;
     case 'opfoelgning': page = <Followups />; break;
     case 'netvaerk': page = <Network />; break;
     case 'rating': page = <Rating />; break;
