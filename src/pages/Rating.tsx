@@ -24,6 +24,7 @@ export default function Rating() {
   const [sort, setSort] = useState<'name' | 'score'>('name');
   const [local, setLocal] = useState<Record<string, Val | undefined>>({});
   const [err, setErr] = useState<string | null>(null);
+  const [noteLocal, setNoteLocal] = useState<Record<string, string>>({});
   const opts = useCompanyOpts();
 
   const { data, error, loading } = useAsync(async () => {
@@ -34,8 +35,9 @@ export default function Rating() {
       fetchAll<{ id: string; name: string }>((f, t) => supabase.from('company').select('id,name').eq('active', true).order('name').order('id').range(f, t)),
     ]);
     if (cr.error) throw cr.error; if (br.error) throw br.error;
+    const nt = await supabase.from('company_rating_note').select('company_id,note').limit(10000); if (nt.error) throw nt.error;
     const rt = await fetchAll<{ company_id: string; criterion_id: string; value: Val }>((f, t) => supabase.from('company_rating').select('company_id,criterion_id,value').order('company_id').order('criterion_id').range(f, t));
-    return { crit: cr.data as Crit[], branches: br.data as { id: string; code: string }[], cb, names: new Map(co.map((c) => [c.id, c.name])), rt };
+    return { crit: cr.data as Crit[], branches: br.data as { id: string; code: string }[], cb, names: new Map(co.map((c) => [c.id, c.name])), rt, notes: new Map((nt.data ?? []).map((x: { company_id: string; note: string }) => [x.company_id, x.note])) };
   }, [], 'rating');
 
   const view = useMemo(() => {
@@ -66,6 +68,14 @@ export default function Rating() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, data, q, need, min, sort, local, grpOff]);
 
+  const noteOf = (c: string) => (c in noteLocal ? noteLocal[c] : data?.notes.get(c) ?? '');
+  async function saveNote(c: string) {
+    const v = noteOf(c).trim(); if (v === (data?.notes.get(c) ?? '')) return;
+    setErr(null);
+    const r = v ? await supabase.from('company_rating_note').upsert({ company_id: c, note: v, updated_at: new Date().toISOString() }, { onConflict: 'company_id' }) : await supabase.from('company_rating_note').delete().eq('company_id', c);
+    if (r.error) { setErr(r.error.message); return; }
+    if (data) { if (v) data.notes.set(c, v); else data.notes.delete(c); }
+  }
   async function setVal(company: string, k: string, nv: Val | undefined) {
     const key = company + '|' + k; setOpen(null);
     setLocal((x) => ({ ...x, [key]: nv })); setErr(null);
@@ -122,6 +132,7 @@ export default function Rating() {
                 <th className="hmname" rowSpan={2}>Virksomhed ({rows.length})</th>
                 {groups.filter((g) => !grpOff.includes(g)).map((g) => <th key={g} className="hmgrp" colSpan={cols.filter((c) => c.grp === g).length}>{GRP[g] ?? g}</th>)}
                 <th className="num hmscore" rowSpan={2}>Score</th>
+                <th className="hmnote" rowSpan={2}>Noter</th>
               </tr>
               <tr>
                 {cols.map((c) => <th key={c.id} className={'hmv' + (need.includes(c.id) ? ' on' : '')}><button onClick={() => toggle(need, setNeed, c.id)} aria-pressed={need.includes(c.id)} title="Filtrér: skal kunne">{c.name}</button></th>)}
@@ -143,11 +154,12 @@ export default function Rating() {
                     </td>
                   ); })}
                   <td className="num hmscore">{r.score}<span className="mute">/{cols.length * 5}</span></td>
+                  <td className="hmnote"><textarea rows={2} value={noteOf(r.id)} onChange={(e) => setNoteLocal((x) => ({ ...x, [r.id]: e.target.value }))} onBlur={() => saveNote(r.id)} aria-label={'Noter for ' + r.name} placeholder="Noter" /></td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
-              <tr><td className="hmname mute">Antal 4-5</td>{cols.map((c) => <td key={c.id} className="hmc mute">{strong(c.id)}</td>)}<td /></tr>
+              <tr><td className="hmname mute">Antal 4-5</td>{cols.map((c) => <td key={c.id} className="hmc mute">{strong(c.id)}</td>)}<td /><td /></tr>
             </tfoot>
           </table>
         </div>
