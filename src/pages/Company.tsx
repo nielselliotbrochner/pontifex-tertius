@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAsync } from '../lib/useAsync';
 import { go } from '../lib/nav';
@@ -117,6 +117,7 @@ export default function Company({ id }: { id: string | null }) {
           <div className="bar"><button className="btn ghost sm" onClick={() => setEdit(true)}>Redigér</button></div>
           {id && <Branches cid={id} />}
           {id && <Names cid={id} names={data.names} onChange={reload} />}
+          {id && <RatingNote cid={id} />}
         </>
       )}
       {id && (
@@ -180,6 +181,32 @@ function Owners({ id, owners, nameOf, options, onChange }: { id: string; owners:
         <Field label="Ejerandel i procent"><input inputMode="decimal" value={share} onChange={(e) => setShare(e.target.value)} /></Field>
       </div>
       <div className="bar"><label className="check"><input type="checkbox" checked={main} onChange={(e) => setMain(e.target.checked)} /> Hovedejer</label><button className="btn ghost sm" onClick={add}>Tilføj</button></div>
+    </>
+  );
+}
+
+function RatingNote({ cid }: { cid: string }) {
+  const [v, setV] = useState(''); const [saved, setSaved] = useState(''); const [ready, setReady] = useState(false); const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    supabase.from('company_rating_note').select('note').eq('company_id', cid).maybeSingle().then((r) => {
+      if (!live) return; if (r.error) { setErr(r.error.message); return; }
+      const n = (r.data?.note as string | undefined) ?? ''; setV(n); setSaved(n); setReady(true);
+    });
+    return () => { live = false; };
+  }, [cid]);
+  async function save() {
+    const t = v.trim(); if (t === saved) return; setErr(null);
+    const r = t ? await supabase.from('company_rating_note').upsert({ company_id: cid, note: t, updated_at: new Date().toISOString() }, { onConflict: 'company_id' }) : await supabase.from('company_rating_note').delete().eq('company_id', cid);
+    if (r.error) { setErr(r.error.message); return; }
+    setSaved(t); setV(t);
+  }
+  return (
+    <>
+      <h2>Noter</h2>
+      <p className="mute" style={{ marginTop: 0 }}>Samme note som under fanen Rating.</p>
+      <Err msg={err} />
+      <textarea rows={4} style={{ width: '100%', maxWidth: 720, font: 'inherit', boxSizing: 'border-box' }} value={v} disabled={!ready} onChange={(e) => setV(e.target.value)} onBlur={save} aria-label="Noter" placeholder="Skriv noter om virksomheden" />
     </>
   );
 }
