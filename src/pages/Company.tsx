@@ -7,11 +7,11 @@ import { useLookups } from '../lib/lookups';
 import { CompanyPick, findCompany, useCompanyOpts } from '../lib/CompanyPick';
 
 type NameRow = { id: string; name: string; valid_from: string | null; valid_to: string | null };
-type Co = { id: string; name: string; cvr: string | null; website: string | null; type_id: string | null; sector_id: string | null };
+type Co = { id: string; name: string; cvr: string | null; website: string | null; address: string | null; postal_code: string | null; city: string | null; type_id: string | null; sector_id: string | null };
 type Own = { id: string; owner_company_id: string; owned_company_id: string; share_pct: number | null; is_main: boolean };
 type Member = { id: string; title: string | null; start_date: string | null; end_date: string | null; contact: { id: string; first_name: string; middle_name: string | null; last_name: string | null } | null; contact_company_level: { level: { name: string; sort_order: number; is_ranked: boolean } | null }[] };
 const nz = (s: string | null | undefined) => (s && s.trim() ? s.trim() : null);
-const blank: Co = { id: '', name: '', cvr: '', website: '', type_id: null, sector_id: null };
+const blank: Co = { id: '', name: '', cvr: '', website: '', address: '', postal_code: '', city: '', type_id: null, sector_id: null };
 
 type CAct = { id: string; occurred_on: string; title: string; type: { name: string } | null };
 const yr = (d: string | null) => (d ? d.slice(0, 4) : '');
@@ -28,7 +28,7 @@ export default function Company({ id }: { id: string | null }) {
     const br = brs.data as { id: string; name: string }[];
     if (!id) return { co: blank, own: all.data as Own[], members: [] as Member[], acts: [] as CAct[], mentioned: [] as CAct[], br, mine: [] as string[], names: [] as NameRow[] };
     const [co, mem, pa, ac, mb, nh] = await Promise.all([
-      supabase.from('company').select('id,name,cvr,website,type_id,sector_id').eq('id', id).single(),
+      supabase.from('company').select('id,name,cvr,website,address,postal_code,city,type_id,sector_id').eq('id', id).single(),
       supabase.from('contact_company').select('id,title,start_date,end_date,contact(id,first_name,middle_name,last_name),contact_company_level(level(name,sort_order,is_ranked))').eq('company_id', id).order('end_date', { ascending: false, nullsFirst: true }).order('start_date', { ascending: false, nullsFirst: false }),
       supabase.from('activity_participant').select('activity(id,occurred_on,title,type:activity_type(name))').eq('company_id', id),
       supabase.from('activity_company').select('activity(id,occurred_on,title,type:activity_type(name))').eq('company_id', id),
@@ -51,7 +51,7 @@ export default function Company({ id }: { id: string | null }) {
 
   async function save() {
     setMsg(null);
-    const payload = { name: c.name.trim(), cvr: nz(c.cvr), website: nz(c.website), type_id: c.type_id || null, sector_id: c.sector_id || null };
+    const payload = { name: c.name.trim(), cvr: nz(c.cvr), website: nz(c.website), address: nz(c.address), postal_code: nz(c.postal_code), city: nz(c.city), type_id: c.type_id || null, sector_id: c.sector_id || null };
     const res = id ? await supabase.from('company').update(payload).eq('id', id).select('id').single() : await supabase.from('company').insert(payload).select('id').single();
     if (res.error) { setMsg(res.error.message.includes('company_cvr_uq') ? 'CVR-nummeret findes allerede.' : res.error.message); return; }
     const cid = res.data.id as string; const mine0 = data!.mine; const want = bsel ?? mine0;
@@ -93,6 +93,9 @@ export default function Company({ id }: { id: string | null }) {
             <Field label="Navn"><input value={c.name} onChange={(e) => set('name', e.target.value)} /></Field>
             <Field label="CVR"><input inputMode="numeric" value={c.cvr ?? ''} onChange={(e) => set('cvr', e.target.value)} /></Field>
             <Field label="Hjemmeside"><input value={c.website ?? ''} onChange={(e) => set('website', e.target.value)} /></Field>
+            <Field label="Adresse"><input value={c.address ?? ''} onChange={(e) => set('address', e.target.value)} placeholder="Fx Slotsgade 2, 3. tv" /></Field>
+            <Field label="Postnummer"><input inputMode="numeric" value={c.postal_code ?? ''} onChange={(e) => set('postal_code', e.target.value)} /></Field>
+            <Field label="By"><input value={c.city ?? ''} onChange={(e) => set('city', e.target.value)} /></Field>
             <Field label="Type"><select value={c.type_id ?? ''} onChange={(e) => set('type_id', e.target.value || null)}><option value="">Ikke angivet</option>{lk.data?.company_type.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select></Field>
             <Field label="Sektor"><select value={c.sector_id ?? ''} onChange={(e) => set('sector_id', e.target.value || null)}><option value="">Ikke angivet</option>{lk.data?.sector.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select></Field>
           </div>
@@ -110,6 +113,7 @@ export default function Company({ id }: { id: string | null }) {
         <>
           <p className="sub">{[lk.data?.company_type.find((o) => o.id === data.co.type_id)?.name, data.co.cvr && 'CVR ' + data.co.cvr].filter(Boolean).join(' · ')}
             {data.co.website && <> · <a href={/^https?:/.test(data.co.website) ? data.co.website : 'https://' + data.co.website} target="_blank" rel="noopener noreferrer">{data.co.website}</a></>}</p>
+          {(data.co.address || data.co.postal_code || data.co.city) && <p className="mute" style={{ marginTop: 0 }}>{[data.co.address, [data.co.postal_code, data.co.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')}</p>}
           <div className="bar"><button className="btn ghost sm" onClick={() => setEdit(true)}>Redigér</button></div>
           {id && <Branches cid={id} />}
           {id && <Names cid={id} names={data.names} onChange={reload} />}
