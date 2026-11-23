@@ -8,16 +8,18 @@ type Row = { company_id: string; name: string; cvr: string | null; company_type:
 
 export default function Companies() {
   const { data: all, error, loading } = useAsync(async () => {
-    const [r, br, cb, nh] = await Promise.all([
+    const [r, br, cb, nh, nt] = await Promise.all([
       supabase.from('v_company_overview').select('company_id,name,cvr,company_type,hq_city,parent_name,parent_company_id,owned_count,current_contacts').eq('active', true).order('name').limit(5000),
       supabase.from('branch').select('id,name,sort_order').eq('active', true).order('sort_order'),
       fetchAll<{ company_id: string; branch_id: string }>((f, t) => supabase.from('company_branch').select('company_id,branch_id').order('company_id').order('branch_id').range(f, t)),
       fetchAll<{ company_id: string; name: string }>((f, t) => supabase.from('company_name_history').select('company_id,name').order('company_id').order('name').range(f, t)),
+      supabase.from('company_rating_note').select('company_id,note').limit(10000),
     ]);
     if (r.error) throw r.error; if (br.error) throw br.error;
     const by = new Map<string, Set<string>>(); for (const x of cb) (by.get(x.company_id) ?? by.set(x.company_id, new Set()).get(x.company_id)!).add(x.branch_id);
     const old = new Map<string, string[]>(); for (const x of nh) (old.get(x.company_id) ?? old.set(x.company_id, []).get(x.company_id)!).push(x.name);
-    return { old, rows: r.data as Row[], branches: br.data as { id: string; name: string }[], by };
+    const notes = new Map<string, string>((nt.data ?? []).map((x: { company_id: string; note: string }) => [x.company_id, x.note]));
+    return { old, notes, rows: r.data as Row[], branches: br.data as { id: string; name: string }[], by };
   }, [], 'companies');
   const data = all?.rows;
   const [q, setQ] = useState('');
@@ -27,7 +29,7 @@ export default function Companies() {
   const rows = useMemo(() => {
     const s = q.trim().toLowerCase();
     return (data ?? []).filter((r) => {
-      if (s && ![r.name, r.cvr, r.hq_city, r.parent_name, ...(all?.old.get(r.company_id) ?? [])].some((x) => x?.toLowerCase().includes(s))) return false;
+      if (s && ![r.name, r.cvr, r.hq_city, r.parent_name, ...(all?.old.get(r.company_id) ?? []), all?.notes.get(r.company_id)].some((x) => x?.toLowerCase().includes(s))) return false;
       if (!sel.length) return true;
       const mine = all?.by.get(r.company_id); if (!mine) return false;
       return every ? sel.every((b) => mine.has(b)) : sel.some((b) => mine.has(b));
@@ -39,7 +41,7 @@ export default function Companies() {
       <h1>Virksomheder</h1>
       <div className="kpis"><div><b>{total}</b><span>virksomheder</span></div><div><b>{(data ?? []).filter((r) => r.owned_count > 0).length}</b><span>med ejede selskaber</span></div></div>
       <div className="bar">
-        <input className="grow" type="search" placeholder="Søg navn, CVR, by, ejer" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Søg" />
+        <input className="grow" type="search" placeholder="Søg navn, CVR, by, ejer, noter" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Søg" />
         <Link view="virksomhed-ny" className="btn">Ny virksomhed</Link>
       </div>
       {all && all.branches.length > 0 && (
