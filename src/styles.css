@@ -207,3 +207,5 @@ button.hm:hover { outline: 1px solid var(--ink); }
 
 .hmtable .hmnote { min-width: 240px; vertical-align: top; text-align: left; }
 .hmtable td.hmnote textarea { width: 100%; min-width: 220px; font: inherit; font-size: calc(12px * var(--s, 1)); padding: 4px 6px; resize: vertical; box-sizing: border-box; }
+
+.acq { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--ink, #111); box-sizing: border-box; vertical-align: middle; background: conic-gradient(var(--ink, #111) calc(var(--p) * 1%), transparent 0); }
