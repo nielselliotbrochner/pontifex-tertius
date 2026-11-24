@@ -8,7 +8,7 @@ import { fetchAll } from '../lib/fetchAll';
 type Row = { podcast?: boolean; acq_id?: string | null; label_ids?: string[]; contact_id: string; first_name: string; middle_name: string | null; last_name: string | null; email: string | null; company_name: string | null;
   title: string | null; labels: string | null; rank: number | null; is_decision_maker: boolean | null; city: string | null; start_date: string | null };
 
-const SORTS = ['rank', 'acq', 'first', 'last', 'company', 'title'] as const;
+const SORTS = ['rank', 'acq', 'pod', 'first', 'last', 'company', 'title'] as const;
 type SortKey = (typeof SORTS)[number];
 
 export default function Persons() {
@@ -56,7 +56,7 @@ export default function Persons() {
   const [sort, setSort] = useState<{ k: SortKey; d: 1 | -1 }>(() => { try { const v = JSON.parse(localStorage.getItem('personsort') || ''); if (v && SORTS.includes(v.k)) return v; } catch { /* ignoreres */ } return { k: 'last', d: 1 }; });
   const sorted = useMemo(() => {
     const col = new Intl.Collator('sv', { sensitivity: 'base', numeric: true });
-    const val = (r: Row): string | number | null => sort.k === 'rank' ? r.rank : sort.k === 'acq' ? acqIdx(r.acq_id) : sort.k === 'first' ? [r.first_name, r.middle_name].filter(Boolean).join(' ') : sort.k === 'last' ? r.last_name : sort.k === 'company' ? r.company_name : r.title;
+    const val = (r: Row): string | number | null => sort.k === 'rank' ? r.rank : sort.k === 'acq' ? acqIdx(r.acq_id) : sort.k === 'pod' ? (r.podcast ? 1 : null) : sort.k === 'first' ? [r.first_name, r.middle_name].filter(Boolean).join(' ') : sort.k === 'last' ? r.last_name : sort.k === 'company' ? r.company_name : r.title;
     const cmp = (a: string | number | null, b: string | number | null) => (typeof a === 'number' && typeof b === 'number' ? a - b : col.compare(String(a), String(b)));
     return [...rows].sort((a, b) => {
       const x = val(a), y = val(b); const xe = x === null || x === '', ye = y === null || y === '';
@@ -97,7 +97,7 @@ export default function Persons() {
       {!loading && total === 0 && !error && <Empty title="Ingen personer endnu" text="Opret den første, eller importer din Excel-fil." />}
       {rows.length > 0 && (
         <table className="ptable">
-          <thead><tr>{th('rank', 'Rang', 'num')}{th('acq', 'Kendskab', 'num')}{th('first', 'Fornavn')}{th('last', 'Efternavn')}{th('company', 'Virksomhed')}{th('title', 'Titel', 'hide-s')}<th className="hide-s">By</th></tr></thead>
+          <thead><tr>{th('rank', 'Rang', 'num')}{th('acq', 'Kendskab', 'num')}{th('pod', 'Podcast', 'num')}{th('first', 'Fornavn')}{th('last', 'Efternavn')}{th('company', 'Virksomhed')}{th('title', 'Titel', 'hide-s')}<th className="hide-s">By</th></tr></thead>
           <tbody>
             {sorted.map((r) => (
               <tr key={r.contact_id}>
@@ -112,6 +112,7 @@ export default function Persons() {
                         <button onClick={() => setAcqFor(r.contact_id, null)}>{sym(null)}<span className="grow">Ikke angivet</span><span className="mute">6</span></button>
                       </div>)}
                   </>); })()}</td>
+                <td className="num">{r.podcast && <svg className="mic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label="Relevant for podcast"><title>Relevant for podcast</title><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8" /></svg>}</td>
                 <td><Link view="person" id={r.contact_id}>{[r.first_name, r.middle_name].filter(Boolean).join(' ')}</Link></td>
                 <td><Link view="person" id={r.contact_id}>{r.last_name}</Link>{r.is_decision_maker && <> <span className="dm" title="Beslutningstager">B</span></>}</td>
                 <td>{r.company_name ?? <span className="mute">Ingen tilknytning</span>}<div className="mute show-s">{r.title}</div>{r.labels && <div className="hide-s">{r.labels.split(', ').map((l) => <span className="tag" key={l}>{l}</span>)}</div>}</td>

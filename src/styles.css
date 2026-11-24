@@ -216,3 +216,5 @@ button.hm:hover { outline: 1px solid var(--ink); }
 .acqpick { position: absolute; left: 50%; top: 100%; transform: translateX(-14px); z-index: 20; background: var(--paper, #fff); border: 1px solid var(--ink, #111); padding: 4px; min-width: 200px; text-align: left; }
 .acqpick button { all: unset; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 6px 8px; width: calc(100% - 16px); font-size: calc(12px * var(--s)); }
 .acqpick button:hover, .acqpick button:focus-visible { background: var(--strip, #eee); }
+
+.ptable .mic { display: inline-block; vertical-align: middle; color: var(--ink, #111); }
