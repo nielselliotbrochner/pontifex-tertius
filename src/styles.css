@@ -209,3 +209,10 @@ button.hm:hover { outline: 1px solid var(--ink); }
 .hmtable td.hmnote textarea { width: 100%; min-width: 220px; font: inherit; font-size: calc(12px * var(--s, 1)); padding: 4px 6px; resize: vertical; box-sizing: border-box; }
 
 .acq { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--ink, #111); box-sizing: border-box; vertical-align: middle; background: conic-gradient(var(--ink, #111) calc(var(--p) * 1%), transparent 0); }
+
+.acqcell { position: relative; }
+.acqbtn { all: unset; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 24px; }
+.acqbtn:hover, .acqbtn:focus-visible { outline: 1px solid var(--ink, #111); }
+.acqpick { position: absolute; left: 50%; top: 100%; transform: translateX(-14px); z-index: 20; background: var(--paper, #fff); border: 1px solid var(--ink, #111); padding: 4px; min-width: 200px; text-align: left; }
+.acqpick button { all: unset; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 6px 8px; width: calc(100% - 16px); font-size: calc(12px * var(--s)); }
+.acqpick button:hover, .acqpick button:focus-visible { background: var(--strip, #eee); }

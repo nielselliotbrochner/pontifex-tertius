@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAsync } from '../lib/useAsync';
 import { Link, Empty, Err, fullName } from '../lib/ui';
@@ -30,13 +30,29 @@ export default function Persons() {
   const [q, setQ] = useState('');
   const [dm, setDm] = useState(false);
   const [acq, setAcq] = useState('');
+  const [acqLocal, setAcqLocal] = useState<Record<string, string | null>>({});
+  const [openAcq, setOpenAcq] = useState<string | null>(null);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const people = useMemo(() => (data ?? []).map((r) => (r.contact_id in acqLocal ? { ...r, acq_id: acqLocal[r.contact_id] } : r)), [data, acqLocal]);
+  useEffect(() => {
+    if (!openAcq) return;
+    const close = (e: MouseEvent | KeyboardEvent) => { if (e instanceof KeyboardEvent ? e.key === 'Escape' : !(e.target as HTMLElement).closest('.acqcell')) setOpenAcq(null); };
+    document.addEventListener('mousedown', close); document.addEventListener('keydown', close);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', close); };
+  }, [openAcq]);
+  async function setAcqFor(cid: string, v: string | null) {
+    const prev = cid in acqLocal ? acqLocal[cid] : undefined;
+    setOpenAcq(null); setSaveErr(null); setAcqLocal((x) => ({ ...x, [cid]: v }));
+    const r = await supabase.from('contact_relation').upsert({ contact_id: cid, acquaintance_id: v }, { onConflict: 'owner_id,contact_id' });
+    if (r.error) { setSaveErr(r.error.message); setAcqLocal((x) => { const y = { ...x }; if (prev === undefined) delete y[cid]; else y[cid] = prev; return y; }); }
+  }
   const acqList = lk.data?.acquaintance ?? [];
   const acqIdx = (id: string | null | undefined) => { const i = acqList.findIndex((o) => o.id === id); return i < 0 ? null : i + 1; };
   const rows = useMemo(() => {
     const s = q.trim().toLowerCase();
-    return (data ?? []).filter((r) => (!dm || r.is_decision_maker) && (!pc || r.podcast) && (!lbl || r.label_ids?.includes(lbl)) && (!acq || (acq === 'none' ? !r.acq_id : r.acq_id === acq)) &&
+    return people.filter((r) => (!dm || r.is_decision_maker) && (!pc || r.podcast) && (!lbl || r.label_ids?.includes(lbl)) && (!acq || (acq === 'none' ? !r.acq_id : r.acq_id === acq)) &&
       (!s || [fullName(r), r.company_name, r.title, r.email, r.city].some((x) => x?.toLowerCase().includes(s))));
-  }, [data, q, dm, pc, lbl, acq]);
+  }, [people, q, dm, pc, lbl, acq]);
   const [sort, setSort] = useState<{ k: SortKey; d: 1 | -1 }>(() => { try { const v = JSON.parse(localStorage.getItem('personsort') || ''); if (v && SORTS.includes(v.k)) return v; } catch { /* ignoreres */ } return { k: 'last', d: 1 }; });
   const sorted = useMemo(() => {
     const col = new Intl.Collator('sv', { sensitivity: 'base', numeric: true });
@@ -77,7 +93,7 @@ export default function Persons() {
         <select value={lbl} onChange={(e) => setLbl(e.target.value)} aria-label="Label"><option value="">Alle labels</option>{lk.data?.label.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select>
         <Link view="person-ny" className="btn">Ny person</Link>
       </div>
-      <Err msg={error} />
+      <Err msg={error ?? saveErr} />
       {!loading && total === 0 && !error && <Empty title="Ingen personer endnu" text="Opret den første, eller importer din Excel-fil." />}
       {rows.length > 0 && (
         <table className="ptable">
@@ -86,7 +102,16 @@ export default function Persons() {
             {sorted.map((r) => (
               <tr key={r.contact_id}>
                 <td className="num"><span className="rank">{r.rank ?? ''}</span></td>
-                <td className="num">{(() => { const i = acqIdx(r.acq_id); const nm = acqList[(i ?? 0) - 1]?.name; return i ? <span className="acq" style={{ '--p': i * 20 } as React.CSSProperties} role="img" title={nm} aria-label={'Kendskab: ' + nm} /> : <span className="mute" title="Ikke angivet" aria-label="Kendskab ikke angivet">·</span>; })()}</td>
+                <td className="num acqcell">{(() => { const i = acqIdx(r.acq_id); const nm = acqList[(i ?? 0) - 1]?.name;
+                  const sym = (n: number | null) => n ? <span className="acq" style={{ '--p': n * 20 } as React.CSSProperties} aria-hidden="true" /> : <span className="mute" aria-hidden="true">·</span>;
+                  return (<>
+                    <button className="acqbtn" onClick={() => setOpenAcq(openAcq === r.contact_id ? null : r.contact_id)} aria-expanded={openAcq === r.contact_id} title={nm ?? 'Ikke angivet'} aria-label={'Kendskab for ' + fullName(r) + ': ' + (nm ?? 'ikke angivet')}>{sym(i)}</button>
+                    {openAcq === r.contact_id && (
+                      <div className="acqpick" role="group" aria-label="Vælg kendskab">
+                        {acqList.map((o, k) => <button key={o.id} onClick={() => setAcqFor(r.contact_id, o.id)}>{sym(k + 1)}<span className="grow">{o.name}</span><span className="mute">{k + 1}</span></button>)}
+                        <button onClick={() => setAcqFor(r.contact_id, null)}>{sym(null)}<span className="grow">Ikke angivet</span><span className="mute">6</span></button>
+                      </div>)}
+                  </>); })()}</td>
                 <td><Link view="person" id={r.contact_id}>{[r.first_name, r.middle_name].filter(Boolean).join(' ')}</Link></td>
                 <td><Link view="person" id={r.contact_id}>{r.last_name}</Link>{r.is_decision_maker && <> <span className="dm" title="Beslutningstager">B</span></>}</td>
                 <td>{r.company_name ?? <span className="mute">Ingen tilknytning</span>}<div className="mute show-s">{r.title}</div>{r.labels && <div className="hide-s">{r.labels.split(', ').map((l) => <span className="tag" key={l}>{l}</span>)}</div>}</td>
